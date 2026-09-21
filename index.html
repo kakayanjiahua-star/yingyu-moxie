@@ -2192,6 +2192,10 @@ window.addEventListener('pointerdown', function once(){
 
 /* 启动：先恢复上次的内容和没做完的那一关 */
 applyHashConfig();                    // 支持一次性配置链接 …/#k=你的key
+// 页面已经开着时再点这种链接，只会改 hash 不刷新 —— 所以也要监听 hash 变化
+window.addEventListener('hashchange', ()=>{
+  if(applyHashConfig()){ refreshAiBadge(); toast('AI 识别已配置 ✅', 1600); }
+});
 restoreSession();
 if(restoreRun()){ go('levels'); } else { go('home'); }
 </script>
