@@ -1,0 +1,2199 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#2563EB">
+<title>英语默写小闯关</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ctext y='26' font-size='26'%3E%F0%9F%93%9A%3C/text%3E%3C/svg%3E">
+<style>
+:root{
+  --blue:#2563EB; --blue-d:#1D4ED8; --blue-l:#DBEAFE;
+  --amber:#F59E0B; --amber-l:#FEF3C7;
+  --green:#16A34A; --green-l:#DCFCE7;
+  --red:#EF4444; --red-l:#FEE2E2;
+  --ink:#1F2937; --ink2:#6B7280; --line:#E5E7EB;
+  --card:#FFFFFF; --r:20px;
+  --shadow:0 6px 18px rgba(31,41,55,.10);
+  --shadow-s:0 2px 8px rgba(31,41,55,.08);
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+html,body{margin:0;padding:0;min-height:100%;}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB","Microsoft YaHei",system-ui,sans-serif;
+  color:var(--ink);
+  background:linear-gradient(165deg,#EFF6FF 0%,#F5F3FF 45%,#FEF3C7 100%) fixed;
+  -webkit-text-size-adjust:100%;
+  overscroll-behavior-y:contain;
+  padding-bottom:env(safe-area-inset-bottom);
+}
+button{font-family:inherit;touch-action:manipulation;cursor:pointer;border:none;background:none;color:inherit;}
+input,textarea{font-family:inherit;}
+.hide{display:none !important;}
+
+/* ---------- top bar ---------- */
+.bar{
+  position:sticky;top:0;z-index:50;
+  display:flex;align-items:center;gap:8px;
+  padding:calc(env(safe-area-inset-top) + 8px) 12px 8px;
+  background:rgba(255,255,255,.86);
+  backdrop-filter:saturate(1.6) blur(12px);
+  -webkit-backdrop-filter:saturate(1.6) blur(12px);
+  border-bottom:1px solid rgba(31,41,55,.06);
+}
+.bar-btn{
+  width:42px;height:42px;min-width:42px;border-radius:14px;
+  background:#fff;border:2px solid var(--line);
+  font-size:19px;line-height:1;display:flex;align-items:center;justify-content:center;
+  transition:transform .12s,background .12s;
+}
+.bar-btn:active{transform:scale(.92);background:#F3F4F6;}
+.bar-btn.off{opacity:.38;}
+.bar-title{
+  flex:1;text-align:center;font-weight:800;font-size:17px;letter-spacing:.3px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.bar-right{display:flex;gap:6px;}
+
+/* ---------- layout ---------- */
+.wrap{max-width:820px;margin:0 auto;padding:14px 14px 40px;}
+.screen{animation:fade .22s ease;}
+@keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.card{
+  background:var(--card);border-radius:var(--r);padding:16px;
+  box-shadow:var(--shadow);margin-bottom:14px;
+}
+h1{font-size:22px;margin:0 0 6px;font-weight:900;}
+h2{font-size:17px;margin:0 0 10px;font-weight:800;}
+p.sub{color:var(--ink2);font-size:14px;margin:0 0 12px;line-height:1.55;}
+
+/* ---------- buttons ---------- */
+.btn{
+  display:flex;align-items:center;justify-content:center;gap:8px;
+  width:100%;min-height:54px;padding:12px 16px;border-radius:16px;
+  font-size:17px;font-weight:800;
+  background:#fff;border:2px solid var(--line);
+  transition:transform .1s,box-shadow .1s,background .15s;
+}
+.btn:active{transform:scale(.97);}
+.btn.primary{background:var(--blue);border-color:var(--blue);color:#fff;box-shadow:0 6px 0 var(--blue-d);}
+.btn.primary:active{box-shadow:0 2px 0 var(--blue-d);transform:translateY(3px) scale(.99);}
+.btn.amber{background:var(--amber);border-color:var(--amber);color:#fff;box-shadow:0 6px 0 #B45309;}
+.btn.amber:active{box-shadow:0 2px 0 #B45309;transform:translateY(3px) scale(.99);}
+.btn.green{background:var(--green);border-color:var(--green);color:#fff;box-shadow:0 6px 0 #15803D;}
+.btn.green:active{box-shadow:0 2px 0 #15803D;transform:translateY(3px) scale(.99);}
+.btn.ghost{background:#fff;}
+.btn.sm{min-height:44px;font-size:15px;border-radius:13px;}
+.row{display:flex;gap:10px;}
+.row>*{flex:1;}
+.row.wrap2{flex-wrap:wrap;}
+.chips{display:flex;gap:8px;flex-wrap:wrap;}
+.chip{
+  padding:9px 15px;border-radius:999px;background:#fff;border:2px solid var(--line);
+  font-size:15px;font-weight:700;
+}
+.chip.on{background:var(--blue-l);border-color:var(--blue);color:var(--blue-d);}
+
+/* ---------- upload ---------- */
+.aibadge{
+  display:flex;align-items:center;gap:8px;padding:10px 13px;border-radius:14px;
+  font-size:13.5px;font-weight:700;margin-bottom:13px;line-height:1.45;
+}
+.aibadge.ok{background:var(--green-l);color:#15803D;border:1.5px solid #86EFAC;}
+.aibadge.warn{background:#FEF3C7;color:#92400E;border:1.5px solid #FCD34D;}
+.aibadge.wait{background:#F1F5F9;color:var(--ink2);border:1.5px solid var(--line);}
+.drop{
+  border:2.5px dashed #BFDBFE;border-radius:18px;background:#F8FAFF;
+  padding:22px 14px;text-align:center;transition:background .15s,border-color .15s;
+}
+.drop:active{background:#EFF6FF;border-color:var(--blue);}
+.drop .big{font-size:38px;line-height:1;}
+.drop .t{font-weight:800;margin-top:8px;font-size:16px;}
+.drop .s{color:var(--ink2);font-size:13px;margin-top:4px;}
+textarea#rawText{
+  width:100%;min-height:140px;border-radius:14px;border:2px solid var(--line);
+  padding:12px;font-size:15px;line-height:1.7;resize:vertical;background:#fff;color:var(--ink);
+}
+textarea#rawText:focus{outline:none;border-color:var(--blue);}
+.ocr-bar{margin-top:12px;}
+.progress{height:10px;border-radius:99px;background:#E5E7EB;overflow:hidden;}
+.progress>i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--blue),#60A5FA);transition:width .25s;}
+.ocr-msg{font-size:13px;color:var(--ink2);margin-top:7px;text-align:center;}
+
+/* ---------- review list ---------- */
+.item{
+  display:flex;align-items:center;gap:9px;padding:9px 10px;border-radius:14px;
+  background:#FAFAFA;border:1.5px solid var(--line);margin-bottom:8px;
+}
+.item input[type=text]{
+  border:none;background:transparent;font-size:16px;font-weight:700;color:var(--ink);
+  min-width:0;padding:4px 2px;border-bottom:2px dashed transparent;
+}
+.item input[type=text]:focus{outline:none;border-bottom-color:var(--blue);}
+.item .en{flex:1.25;}
+.item .zh{flex:1;color:var(--blue-d);font-weight:600;font-size:15px;}
+.item .del{
+  width:34px;height:34px;min-width:34px;border-radius:11px;background:#fff;border:1.5px solid var(--line);
+  font-size:15px;color:var(--red);
+}
+.item .mv{
+  width:34px;height:34px;min-width:34px;border-radius:11px;background:#fff;border:1.5px solid var(--line);
+  font-size:14px;color:var(--blue-d);
+}
+.tag{
+  font-size:11px;font-weight:800;padding:3px 8px;border-radius:999px;
+  background:var(--amber-l);color:#92400E;white-space:nowrap;
+}
+.tag.b{background:var(--blue-l);color:var(--blue-d);}
+
+/* ---------- level list ---------- */
+.level{
+  display:flex;align-items:center;gap:13px;padding:14px;border-radius:18px;
+  background:#fff;border:2px solid var(--line);margin-bottom:10px;
+  box-shadow:var(--shadow-s);transition:transform .1s;
+}
+.level:active{transform:scale(.985);}
+.level .ic{font-size:27px;width:44px;text-align:center;}
+.level .mid{flex:1;min-width:0;}
+.level .nm{font-weight:800;font-size:16px;}
+.level .ds{font-size:12.5px;color:var(--ink2);margin-top:2px;}
+.level .go{font-size:20px;color:#CBD5E1;}
+.level.done{border-color:#BBF7D0;background:#F0FDF4;}
+.level.done .go{color:var(--green);}
+.stars-line{font-size:13px;letter-spacing:1px;margin-top:2px;}
+
+/* ---------- play ---------- */
+.pbar{display:flex;align-items:center;gap:10px;margin-bottom:12px;}
+.pbar .progress{flex:1;}
+.pbar .cnt{font-size:13px;font-weight:800;color:var(--ink2);white-space:nowrap;}
+.qcard{
+  background:#fff;border-radius:22px;padding:20px 16px;box-shadow:var(--shadow);
+  text-align:center;margin-bottom:14px;
+}
+.q-zh{font-size:30px;font-weight:900;letter-spacing:2px;line-height:1.35;word-break:break-word;}
+.q-zh.small{font-size:21px;letter-spacing:0;line-height:1.6;}
+.q-hint{font-size:13px;color:var(--ink2);margin-top:8px;}
+.q-en-sent{font-size:19px;line-height:1.8;font-weight:700;}
+.blank{
+  display:inline-block;min-width:92px;border-bottom:3px solid var(--blue);
+  color:var(--blue-d);font-weight:900;
+}
+.opts{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.opt{
+  min-height:62px;border-radius:16px;background:#fff;border:2.5px solid var(--line);
+  font-size:19px;font-weight:800;padding:10px;word-break:break-word;
+  transition:transform .1s,background .15s,border-color .15s;
+}
+.opt:active{transform:scale(.96);}
+.opt.good{background:var(--green-l);border-color:var(--green);color:#15803D;}
+.opt.bad{background:var(--red-l);border-color:var(--red);color:#B91C1C;}
+.opt.mute{opacity:.45;}
+.opt:disabled{pointer-events:none;}
+#afterBox{margin-top:2px;}
+#afterBox .btn{min-height:52px;}
+.opt.wide{grid-column:1 / -1;font-size:17px;}
+
+/* letter puzzle */
+.slots{
+  display:flex;gap:7px;justify-content:center;flex-wrap:wrap;min-height:58px;
+  align-items:center;margin-bottom:16px;
+}
+.slot{
+  width:44px;height:56px;border-radius:12px;border:2.5px dashed #CBD5E1;
+  display:flex;align-items:center;justify-content:center;
+  font-size:24px;font-weight:900;color:var(--blue-d);text-transform:lowercase;
+}
+.slot.filled{border-style:solid;border-color:var(--blue);background:var(--blue-l);}
+.slot.sp{
+  width:28px;border-style:solid;border-color:#E2E8F0;background:#F8FAFC;
+  color:#94A3B8;font-size:15px;font-weight:700;
+}
+.slots{gap:7px;}
+.slot.sp + .slot{margin-left:6px;}
+.tiles{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;}
+.tile{
+  width:50px;height:58px;border-radius:13px;background:#fff;border:2.5px solid var(--line);
+  font-size:23px;font-weight:900;box-shadow:0 3px 0 #E5E7EB;
+  transition:transform .1s;
+}
+.tile:active{transform:scale(.92);}
+.tile.used{opacity:.25;pointer-events:none;}
+.tile.tap{background:var(--amber-l);border-color:var(--amber);}
+
+/* word order */
+.tokens{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;min-height:52px;padding:8px;
+  border-radius:14px;background:#F8FAFC;border:2px dashed #CBD5E1;margin-bottom:14px;}
+.ans-line{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;min-height:52px;padding:8px;
+  border-radius:14px;background:#EFF6FF;border:2px solid var(--blue-l);}
+.wt{
+  padding:9px 13px;border-radius:12px;background:#fff;border:2px solid var(--line);
+  font-size:17px;font-weight:700;box-shadow:0 3px 0 #E5E7EB;
+}
+.wt:active{transform:scale(.94);}
+.wt.used{opacity:.25;pointer-events:none;}
+
+/* write / canvas */
+.writebox{margin-top:6px;}
+canvas.hand{
+  width:100%;height:190px;border-radius:16px;background:#fff;
+  border:2.5px solid var(--line);touch-action:none;display:block;
+}
+canvas.hand.tall{height:250px;}
+.hint4{font-size:12px;color:var(--ink2);text-align:center;margin-top:6px;}
+input.type{
+  width:100%;min-height:58px;border-radius:14px;border:2.5px solid var(--line);
+  font-size:22px;font-weight:800;padding:12px 14px;text-align:center;letter-spacing:1px;
+}
+input.type:focus{outline:none;border-color:var(--blue);}
+.answer{
+  margin-top:12px;padding:12px;border-radius:14px;background:var(--green-l);
+  border:2px solid #86EFAC;font-size:19px;font-weight:900;color:#15803D;word-break:break-word;
+}
+.answer.bad{background:var(--red-l);border-color:#FCA5A5;color:#B91C1C;}
+
+/* result */
+.big-num{font-size:52px;font-weight:900;line-height:1;color:var(--amber);}
+.center{text-align:center;}
+
+/* wrong book / stats */
+.wrow{display:flex;align-items:center;gap:10px;padding:11px 12px;border-radius:14px;
+  background:#fff;border:1.5px solid var(--line);margin-bottom:8px;}
+.wrow .en{font-weight:800;font-size:17px;flex:1.2;min-width:0;word-break:break-word;}
+.wrow .zh{color:var(--ink2);font-size:14px;flex:1;min-width:0;word-break:break-word;}
+.wrow .n{font-size:12px;font-weight:800;color:#B91C1C;background:var(--red-l);padding:3px 8px;border-radius:999px;}
+table.st{width:100%;border-collapse:collapse;font-size:14px;}
+table.st th,table.st td{padding:9px 6px;text-align:center;border-bottom:1px solid var(--line);}
+table.st th{color:var(--ink2);font-weight:700;font-size:12.5px;}
+table.st td.d{text-align:left;font-weight:700;}
+
+/* fx */
+#fx{position:fixed;inset:0;pointer-events:none;z-index:200;overflow:hidden;}
+.fxstar{position:absolute;font-size:30px;animation:fly 1s ease-out forwards;}
+@keyframes fly{0%{opacity:0;transform:translateY(0) scale(.4)}
+  25%{opacity:1;transform:translateY(-30px) scale(1.25)}
+  100%{opacity:0;transform:translateY(-150px) scale(.85)}}
+#combo{
+  position:fixed;left:50%;top:34%;transform:translate(-50%,-50%) scale(.6);
+  font-size:38px;font-weight:900;color:var(--amber);z-index:210;pointer-events:none;
+  text-shadow:0 3px 0 #fff,0 0 22px rgba(245,158,11,.7);opacity:0;
+}
+#combo.show{animation:pop .9s ease-out;}
+@keyframes pop{0%{opacity:0;transform:translate(-50%,-50%) scale(.4)}
+  30%{opacity:1;transform:translate(-50%,-50%) scale(1.15)}
+  75%{opacity:1;transform:translate(-50%,-50%) scale(1)}
+  100%{opacity:0;transform:translate(-50%,-70%) scale(1)}}
+.shake{animation:shk .4s;}
+@keyframes shk{0%,100%{transform:translateX(0)}20%{transform:translateX(-9px)}
+  40%{transform:translateX(9px)}60%{transform:translateX(-6px)}80%{transform:translateX(6px)}}
+#toast{
+  position:fixed;left:50%;bottom:calc(28px + env(safe-area-inset-bottom));transform:translateX(-50%) translateY(20px);
+  background:rgba(31,41,55,.94);color:#fff;padding:11px 20px;border-radius:999px;
+  font-size:14px;font-weight:700;z-index:300;opacity:0;transition:.25s;pointer-events:none;max-width:88vw;text-align:center;
+}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+/* ---------- 确认弹窗（iOS 上比系统 confirm 好看，也能给多个选项） ---------- */
+#modal{position:fixed;inset:0;background:rgba(17,24,39,.45);z-index:400;
+  display:flex;align-items:center;justify-content:center;padding:20px;animation:fade .15s}
+.mbox{background:#fff;border-radius:22px;padding:22px;max-width:440px;width:100%;
+  box-shadow:0 20px 50px rgba(0,0,0,.25);max-height:80vh;overflow:auto}
+.mbox h3{margin:0 0 8px;font-size:19px;font-weight:900}
+.mbox p{margin:0 0 16px;font-size:14.5px;color:var(--ink2);line-height:1.6;white-space:pre-line}
+.mrow{display:flex;gap:10px;flex-wrap:wrap}
+.mrow .btn{flex:1;min-width:118px;}
+/* ---------- 上传前裁切 ---------- */
+.cropstage{display:flex;justify-content:center;background:#0F172A;border-radius:18px;padding:10px;overflow:hidden}
+.cropwrap{position:relative;display:inline-block;max-width:100%;line-height:0;
+  user-select:none;-webkit-user-select:none;touch-action:none}
+.cropwrap img{max-width:100%;max-height:56vh;display:block;pointer-events:none;border-radius:8px}
+.cropbox{position:absolute;box-sizing:border-box;border:2.5px solid #fff;
+  box-shadow:0 0 0 9999px rgba(15,23,42,.62);touch-action:none;cursor:move;border-radius:4px}
+.cropbox i{position:absolute;width:38px;height:38px;border-radius:50%;
+  background:rgba(255,255,255,.95);border:2.5px solid var(--blue);box-sizing:border-box}
+.cropbox i[data-h=nw]{left:-19px;top:-19px}
+.cropbox i[data-h=ne]{right:-19px;top:-19px}
+.cropbox i[data-h=sw]{left:-19px;bottom:-19px}
+.cropbox i[data-h=se]{right:-19px;bottom:-19px}
+.cropthumbs{display:flex;gap:8px;justify-content:center;margin-top:10px;flex-wrap:wrap}
+.cropthumbs span{font-size:12px;font-weight:800;padding:4px 10px;border-radius:999px;
+  background:#E5E7EB;color:#6B7280}
+.cropthumbs span.on{background:var(--blue);color:#fff}
+.spin{display:inline-block;width:15px;height:15px;border:2.5px solid #fff;border-top-color:transparent;
+  border-radius:50%;animation:sp .7s linear infinite;vertical-align:-2px;}
+@keyframes sp{to{transform:rotate(360deg)}}
+@media (max-width:360px){ .opt{font-size:17px;} .q-zh{font-size:26px;} }
+@media (min-width:700px){ .opts{grid-template-columns:1fr 1fr;} }
+</style>
+</head>
+<body>
+
+<div class="bar">
+  <button class="bar-btn" id="btnBack" title="返回上一页">←</button>
+  <button class="bar-btn" id="btnHome" title="回首页">🏠</button>
+  <div class="bar-title" id="barTitle">英语默写小闯关</div>
+  <div class="bar-right">
+    <button class="bar-btn" id="btnSound" title="声音开关">🔊</button>
+    <button class="bar-btn" id="btnWrong" title="错词本">📕</button>
+    <button class="bar-btn" id="btnStats" title="成绩">📊</button>
+  </div>
+</div>
+
+<div class="wrap" id="wrap"></div>
+<div id="fx"></div>
+<div id="combo"></div>
+<div id="toast"></div>
+
+<script>
+/* =========================================================
+   英语默写小闯关 — 单文件版
+   流程：拍照/粘贴 → 校对 → 闯关 → 默写测 → 错词本
+   ========================================================= */
+const $  = (s,r=document)=>r.querySelector(s);
+const $$ = (s,r=document)=>[...r.querySelectorAll(s)];
+const esc = s => String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const shuffle = a=>{a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.random()*(i+1)|0;[a[i],a[j]]=[a[j],a[i]];}return a;};
+const today = ()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');};
+const norm  = s=>String(s||'').replace(/[\u2018\u2019\u02BC\u201B]/g,"'").toLowerCase()
+                   .replace(/[^a-z0-9' ]/g,'').replace(/\s+/g,' ').trim();
+const uniq  = a=>[...new Set(a)];
+
+/* ---------- 持久化 ---------- */
+const K = {wrong:'dxxg.wrong', stats:'dxxg.stats', sound:'dxxg.sound', grade:'dxxg.grade'};
+function load(k,d){ try{const v=localStorage.getItem(k);return v?JSON.parse(v):d;}catch(e){return d;} }
+function save(k,v){ try{localStorage.setItem(k,JSON.stringify(v));}catch(e){} }
+
+const Store = {
+  wrong: load(K.wrong,[]),
+  stats: load(K.stats,{}),
+  sound: load(K.sound,true),
+  grade: load(K.grade,3),
+};
+
+/* ---------- 全局状态 ---------- */
+const S = {
+  words: [],   // {en, zh, on}
+  sents: [],   // {en, zh, on, key}
+  done: {},    // levelId -> stars
+  writeMode: 'hand',   // hand | type
+  lastWrong: [],
+};
+
+/* ---------- 词库 / 干扰项 ---------- */
+const POOL = ['apple','banana','orange','tiger','monkey','school','teacher','student','pencil','water',
+ 'happy','family','garden','window','yellow','panda','rabbit','flower','friend','summer','winter',
+ 'morning','picture','music','doctor','farmer','driver','kitchen','holiday','birthday','animal',
+ 'brother','sister','country','weather','library','homework','breakfast','afternoon','beautiful','delicious'];
+
+/* =========================================================
+   声音
+   ========================================================= */
+let voice = null;
+function pickVoice(){
+  try{
+    const vs = speechSynthesis.getVoices()||[];
+    voice = vs.find(v=>/en[-_]US/i.test(v.lang)&&/samantha|alex|google us english|aaron|nicky/i.test(v.name))
+         || vs.find(v=>/en[-_]US/i.test(v.lang))
+         || vs.find(v=>/^en/i.test(v.lang)) || null;
+  }catch(e){}
+}
+if('speechSynthesis' in window){ pickVoice(); speechSynthesis.onvoiceschanged = pickVoice; }
+
+/* 自动化/无人值守浏览器（Playwright、Selenium 等 navigator.webdriver=true）默认不发声：
+   Windows 上 Chrome 的朗读走系统 SAPI，不受 --mute-audio 控制，
+   测试脚本跑真实语音引擎时，声音会直接从这台电脑的扬声器放出来。
+   用 let 而不是 const：测试里可以临时打开它，把真实语音链路也测到。 */
+let AUTOMATION = (typeof navigator!=='undefined' && navigator.webdriver === true);
+
+function speak(text, rate){
+  if(!Store.sound || AUTOMATION) return;
+  if(!('speechSynthesis' in window)) return;
+  try{
+    speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(String(text));
+    u.lang='en-US'; u.rate = rate||0.82; u.pitch=1;
+    if(voice) u.voice = voice;
+    curUtterance = u;
+    speechSynthesis.speak(u);
+  }catch(e){}
+}
+let AC=null;
+let speakSeq = 0;            // 每来一次发声请求就 +1；旧请求发现序号变了就直接放弃
+let curUtterance = null;     // 保住引用：有些浏览器会把还没念完的 utterance 回收掉
+
+function stopSpeak(){
+  speakSeq++;
+  try{ if('speechSynthesis' in window) speechSynthesis.cancel(); }catch(e){}
+  curUtterance = null;
+}
+/* 念完才 resolve。三个关键点：
+   ① cancel() 之后必须「让一拍」再 speak()。iOS Safari 上紧挨着调用会打架：
+      旧语音继续念、新语音排到它后面 —— 表现就是「题目已经换了，念的还是上一题」。
+   ② 带序号：让这一拍期间如果又来了新请求，旧的就彻底放弃，绝不补念。
+   ③ 超时兜底：iOS 上 onend 偶尔不触发。 */
+function speakWait(text, rate){
+  const mySeq = ++speakSeq;
+  return new Promise(resolve=>{
+    if(AUTOMATION || !Store.sound || !text || !('speechSynthesis' in window)) return resolve();
+    let done=false;
+    const fin=()=>{ if(done) return; done=true; resolve(); };
+    const t = String(text);
+    try{ speechSynthesis.cancel(); }catch(e){}
+    setTimeout(()=>{
+      if(mySeq !== speakSeq) return fin();      // 已被更新的请求取代：这一个字都不要念
+      try{
+        const u = new SpeechSynthesisUtterance(t);
+        u.lang='en-US'; u.rate = rate||0.82; u.pitch=1;
+        if(voice) u.voice = voice;
+        u.onend = fin; u.onerror = fin;
+        curUtterance = u;
+        speechSynthesis.speak(u);
+      }catch(e){ fin(); }
+    }, 90);
+    setTimeout(fin, Math.min(12000, 1800 + t.length*110));
+  });
+}
+function beep(kind){
+  if(!Store.sound || AUTOMATION) return;
+  try{
+    AC = AC || new (window.AudioContext||window.webkitAudioContext)();
+    if(AC.state==='suspended') AC.resume();
+    const seq = kind==='ok'   ? [[660,0,.09],[880,.09,.13]]
+              : kind==='bad'  ? [[220,0,.18]]
+              : kind==='done' ? [[660,0,.09],[880,.1,.09],[1180,.2,.22]]
+              : [[520,0,.08]];
+    seq.forEach(([f,t,d])=>{
+      const o=AC.createOscillator(), g=AC.createGain();
+      o.type= kind==='bad'?'sawtooth':'sine'; o.frequency.value=f;
+      o.connect(g); g.connect(AC.destination);
+      const st=AC.currentTime+t;
+      g.gain.setValueAtTime(.0001,st);
+      g.gain.exponentialRampToValueAtTime(kind==='bad'?.12:.16, st+.012);
+      g.gain.exponentialRampToValueAtTime(.0001, st+d);
+      o.start(st); o.stop(st+d+.02);
+    });
+  }catch(e){}
+}
+
+/* =========================================================
+   小工具：吐司 / 特效 / 星星
+   ========================================================= */
+let toastT=null;
+function toast(msg,ms){
+  const t=$('#toast'); t.textContent=msg; t.classList.add('show');
+  clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove('show'), ms||1800);
+}
+function fxStars(n){
+  const box=$('#fx'), w=window.innerWidth, h=window.innerHeight;
+  for(let i=0;i<(n||3);i++){
+    const s=document.createElement('div');
+    s.className='fxstar'; s.textContent= Math.random()<.25?'🌟':'⭐';
+    s.style.left = (w*0.5 + (Math.random()*260-130))+'px';
+    s.style.top  = (h*0.42 + (Math.random()*90-45))+'px';
+    s.style.animationDelay = (i*70)+'ms';
+    box.appendChild(s);
+    setTimeout(()=>s.remove(), 1300+i*70);
+  }
+}
+function combo(n){
+  const c=$('#combo');
+  const words = n>=8?'太强了！':n>=5?'超级连对':n>=3?'连对':'';
+  if(!words) return;
+  c.textContent = words+' x'+n+' 🔥';
+  c.classList.remove('show'); void c.offsetWidth; c.classList.add('show');
+}
+
+/* ---------- 弹窗 ---------- */
+function closeModal(){ const m=$('#modal'); if(m) m.remove(); }
+function showModal(title, body, buttons){
+  closeModal();
+  const w=document.createElement('div');
+  w.id='modal';
+  w.innerHTML = `<div class="mbox"><h3>${esc(title)}</h3><p>${body||''}</p><div class="mrow"></div></div>`;
+  document.body.appendChild(w);
+  const row=w.querySelector('.mrow');
+  (buttons||[]).forEach(b=>{
+    const el=document.createElement('button');
+    el.className='btn sm '+(b.primary?'primary':(b.danger?'':'ghost'));
+    if(b.danger) el.style.cssText='border-color:#FCA5A5;color:#B91C1C';
+    el.textContent=b.t;
+    el.onclick=()=>{ closeModal(); if(b.fn) b.fn(); };
+    row.appendChild(el);
+  });
+  w.onclick = e=>{ if(e.target===w) closeModal(); };
+}
+
+/* =========================================================
+   文本解析：把 OCR / 粘贴的文字拆成 单词 & 句子
+   ========================================================= */
+function cleanLine(s){
+  return String(s)
+    .replace(/[|‖_~`^]/g,' ')
+    .replace(/^[\s\u3000]*[0-9]{1,2}\s*[\.、)）:：]\s*/,'')   // 序号
+    .replace(/^[\s\u3000]*[•·▪●※★→\-–—]+\s*/,'')            // 项目符号
+    .replace(/\s{2,}/g,' ')
+    .trim();
+}
+function parseBlocks(text){
+  const words=[], sents=[];
+  const lines = String(text||'')
+    .replace(/\r/g,'')
+    .split('\n')
+    .map(cleanLine)
+    .filter(l=>l && /[A-Za-z]/.test(l));
+
+  for(const line of lines){
+    // 英文部分（去掉中文及其标点）
+    const en = line
+      .replace(/[\u4e00-\u9fa5\u3000-\u303F\uFF00-\uFFEF]/g,' ')
+      .replace(/[^A-Za-z'’\-\.\,\?\!\;\:\s]/g,' ')
+      .replace(/\s+/g,' ').trim();
+    // 中文部分
+    const zh = (line.match(/[\u4e00-\u9fa5]+/g)||[]).join(' ').trim();
+
+    const toks = (en.match(/[A-Za-z][A-Za-z'’\-]*/g)||[]);
+    if(toks.length===0) continue;
+
+    /* 判断是「句子」还是「单词/词组」：
+       词组（want to do sth / a lot of / take care of）词数不少，但它是词不是句。
+       所以不能只看词数——要看有没有句末标点、或者是不是以主语/冠词开头。 */
+    const endsSent = /[.!?。！？]\s*$/.test(line);
+    const startsLikeSent = /^(i|you|he|she|we|they|it|this|that|these|those|my|your|his|her|our|their|the|a|an|there|what|where|who|how|let)\b/i.test(en);
+    const isSent = (endsSent && toks.length >= 3)
+                || toks.length >= 6
+                || (toks.length >= 4 && startsLikeSent);
+
+    if(isSent){
+      let s = en.replace(/\s+([\.\,\?\!\;\:])/g,'$1').trim();
+      if(s && !/[\.\?\!]$/.test(s)) s += '.';
+      sents.push({en:s, zh:zh||'', kind:'sent'});
+    }else{
+      const w = en.replace(/[\.\,\?\!\;\:]+$/,'').trim();
+      if(w) words.push({en:w, zh:zh||'', kind:'word'});
+    }
+  }
+  // 去重
+  const seenW=new Set(), W=[];
+  for(const w of words){ const k=norm(w.en); if(!k||seenW.has(k))continue; seenW.add(k); W.push(w); }
+  const seenS=new Set(), Ss=[];
+  for(const s of sents){ const k=norm(s.en); if(!k||seenS.has(k))continue; seenS.add(k); Ss.push(s); }
+
+  return {words:W.slice(0,60), sents:Ss.slice(0,30)};
+}
+const STOP = new Set('the a an is am are was were be to of in on at and or but it i you he she we they my your his her this that these those do does did can will not no yes very too so here there what who how with for from up down out'.split(' '));
+function pickKey(sentence){
+  const toks = (sentence.match(/[A-Za-z][A-Za-z'\-]*/g)||[]).filter(t=>t.length>=3);
+  const good = toks.filter(t=>!STOP.has(t.toLowerCase()));
+  const list = good.length?good:toks;
+  if(!list.length) return null;
+  return list.slice().sort((a,b)=>b.length-a.length)[0];
+}
+
+/* =========================================================
+   浏览器端 OCR（Tesseract.js，多 CDN 兜底）
+   ========================================================= */
+const OCR_SRC = [
+  'https://fastly.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js',
+  'https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js',
+  'https://unpkg.com/tesseract.js@5.1.1/dist/tesseract.min.js',
+  'https://registry.npmmirror.com/tesseract.js/5.1.1/files/dist/tesseract.min.js'
+];
+const OCR_CDN = [
+  { w:'https://fastly.jsdelivr.net/npm/tesseract.js@5.1.1/dist/worker.min.js',
+    c:'https://fastly.jsdelivr.net/npm/tesseract.js-core@5.1.0/' },
+  { w:'https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/worker.min.js',
+    c:'https://cdn.jsdelivr.net/npm/tesseract.js-core@5.1.0/' },
+  { w:'https://unpkg.com/tesseract.js@5.1.1/dist/worker.min.js',
+    c:'https://unpkg.com/tesseract.js-core@5.1.0/' },
+  { w:'https://registry.npmmirror.com/tesseract.js/5.1.1/files/dist/worker.min.js',
+    c:'https://registry.npmmirror.com/tesseract.js-core/5.1.0/files/' }
+];
+const OCR_LANG_NAME = 'eng+chi_sim';   // 英文 + 简体中文，缺一个提示就没了中文
+/* 语言包：优先用同目录 tessdata/（局域网打开时最快、且不依赖外网），否则回退公共 CDN */
+function localTessDir(){
+  try{ return new URL('tessdata', document.baseURI).href.replace(/\/$/,''); }
+  catch(e){ return 'tessdata'; }
+}
+let langPathsCache = null;
+async function langPaths(){
+  if(langPathsCache) return langPathsCache;
+  const out=[];
+  // 通过局域网/网页打开时，语言包就在同目录 tessdata/，本地最快且不依赖外网。
+  // 只有把 html 当文件直接打开（file://）时才直接用公共源。
+  if(location.protocol==='http:' || location.protocol==='https:') out.push(localTessDir());
+  out.push('https://tessdata.projectnaptha.com/4.0.0');
+  langPathsCache = out;
+  return out;
+}
+let tWorker=null, ocrBusy=false;
+
+function loadScript(src){
+  return new Promise((res,rej)=>{
+    const s=document.createElement('script');
+    s.src=src; s.async=true;
+    s.onload=()=>res(src); s.onerror=()=>{s.remove();rej(new Error('load fail '+src));};
+    document.head.appendChild(s);
+    setTimeout(()=>{ if(!window.Tesseract) rej(new Error('timeout '+src)); }, 22000);
+  });
+}
+async function ensureOcrSrc(){
+  if(window.Tesseract) return true;
+  for(const u of OCR_SRC){
+    try{ await loadScript(u); if(window.Tesseract) return true; }catch(e){}
+  }
+  return !!window.Tesseract;
+}
+async function ensureWorker(onMsg){
+  if(tWorker) return tWorker;
+  const lps = await langPaths();
+  for(let ci=0; ci<OCR_CDN.length; ci++){
+    for(const lp of lps){
+      const c = OCR_CDN[ci];
+      try{
+        if(onMsg) onMsg({status:'retry', progress:0, _try:[ci+1, lp.indexOf('projectnaptha')>=0?'公共源':'本地']});
+        tWorker = await window.Tesseract.createWorker(OCR_LANG_NAME, 1, {
+          workerPath: c.w, corePath: c.c, langPath: lp,
+          logger: m=>{ if(onMsg) onMsg(m); }
+        });
+        return tWorker;
+      }catch(e){ tWorker=null; }
+    }
+  }
+  throw new Error('OCR 引擎加载失败');
+}
+/* =========================================================
+   拍照识别 · 路线一：本地 AI 服务（视觉大模型，准）
+   key 在电脑上，网页里没有；iPad 只跟电脑说话
+   ========================================================= */
+let AI_STATE = 'unknown';   // ready | direct | degraded | none | unknown
+let AI_LAST_ERROR = '';
+async function checkAi(){
+  // ① 本机直连模式（公网页面用这个）：Key 存在这台设备里
+  if(getApiCfg()){ AI_STATE = 'direct'; AI_LAST_ERROR = ''; return AI_STATE; }
+  // ② 局域网模式：电脑上的服务
+  try{
+    const r = await fetch('api/health', {cache:'no-store'});
+    const j = await r.json();
+    AI_STATE = (j && j.ok) ? 'ready' : 'none';
+    AI_LAST_ERROR = (j && !j.ok) ? (j.message || '电脑上没配 API Key') : '';
+  }catch(e){
+    AI_STATE = 'none';
+    AI_LAST_ERROR = '连不上电脑上的服务';
+  }
+  return AI_STATE;
+}
+function loadImg(file){
+  return new Promise((res,rej)=>{
+    const u=URL.createObjectURL(file);
+    const im=new Image();
+    im.onload=()=>{ URL.revokeObjectURL(u); res(im); };
+    im.onerror=()=>{ URL.revokeObjectURL(u); rej(new Error('图片读不出来')); };
+    im.src=u;
+  });
+}
+/* 手机上原图 3-5MB，先缩到长边 1800 再传，又快又够清楚 */
+async function shrink(file, maxSide, q){
+  const im = await loadImg(file);
+  const s = Math.min(1, (maxSide||1800)/Math.max(im.naturalWidth, im.naturalHeight));
+  const c = document.createElement('canvas');
+  c.width  = Math.max(1, Math.round(im.naturalWidth * s));
+  c.height = Math.max(1, Math.round(im.naturalHeight * s));
+  const ctx = c.getContext('2d');
+  ctx.fillStyle='#fff'; ctx.fillRect(0,0,c.width,c.height);
+  ctx.drawImage(im, 0, 0, c.width, c.height);
+  return await new Promise(res=>{
+    if(c.toBlob) c.toBlob(b=>res(b||null), 'image/jpeg', q||0.86);
+    else res(null);
+  });
+}
+
+/* =========================================================
+   公网直连模式
+   页面挂在公网、电脑上的服务不在时，由浏览器直接调百炼
+   （跨域实测可行，2026-09-21）。Key 只存在这台设备里，不进网页源码。
+   ========================================================= */
+const KAPI = 'dxxg.api';
+function getApiCfg(){
+  const v = load(KAPI, null);
+  return (v && v.key) ? v : null;
+}
+function setApiCfg(base, key){
+  save(KAPI, { base: (base||'https://dashscope.aliyuncs.com').replace(/\/+$/,''), key: String(key||'').trim() });
+  AI_STATE = 'unknown'; AI_LAST_ERROR = ''; langPathsCache = null;
+}
+function clearApiCfg(){ try{ localStorage.removeItem(KAPI); }catch(e){} AI_STATE='unknown'; AI_LAST_ERROR=''; }
+
+const OCR_PROMPT = `你是英语教材内容提取助手。从这张课本照片里挑出**值得孩子默写的学习内容**，输出严格 JSON。
+
+【要的，只有两类】
+1. words：生词表/词汇栏里的英文单词或固定词组 + 它的中文意思。
+   例：apple 苹果 ／ want to do sth 想要做某事 ／ look after 照顾
+2. sentences：完整的英文句子（有主谓、3 个词以上）+ 中文翻译。
+   一段连续的短文要按句号/问号/感叹号**拆成多条，一句一条**，不要整段塞成一条。
+   例：She goes to school by bus. 她坐公交车上学。
+
+【不要的，一律忽略，不要出现在结果里】
+- 单元名、课文标题、栏目名、页码、题号（Unit 4 / My Day / P.27 / 一、二、三 / 1. 2.）
+- 中文题目要求（如「读一读，写出下列单词的中文意思」「根据短文内容回答问题」）
+- 中文说明、语法讲解、注释、旁注、页眉页脚
+- 单独的字母、数字、日期、分值、音标
+- 出版社信息、广告、条形码文字
+- 看不清或残缺的内容
+
+【判断标准】
+- 一条内容如果孩子**不需要会写它**，就不要放进来。
+- 宁可少给，也不要凑数。拿不准的一律不要。
+- 同一页里重复出现的只留一次。
+
+【输出】只输出 JSON，不要解释，不要 markdown 代码块：
+{"words":[{"en":"apple","zh":"苹果"}],"sentences":[{"en":"I like apples.","zh":"我喜欢苹果。"}],"ignored":"一句话说明你忽略了哪些东西"}`;
+
+const INSTRUCTION_WORDS = new Set(('read write listen say look match choose fill answer complete tick circle '+
+  'underline translate repeat practise practice total score name class grade date page unit lesson part '+
+  'module section chapter exercise homework english chinese word words sentence sentences question '+
+  'questions example note notes tip tips').split(' '));
+
+function looksLikeJunk(en, zh){
+  const e = String(en||'').trim();
+  if(e.length < 2) return true;
+  if(!/[A-Za-z]/.test(e)) return true;
+  if(/^(unit|lesson|module|part|page|chapter|section|exercise|no|p|pp)\s*[\d.\-]*$/i.test(e)) return true;
+  if(/^[\d.\-–—/:]+l*$/.test(e)) return true;
+  if(!String(zh||'').trim()){
+    const low = e.toLowerCase().replace(/[.!?:;]+$/,'').trim();
+    if(INSTRUCTION_WORDS.has(low)) return true;
+    if(low.split(/\s+/).length<=1 && low.length<=2) return true;
+  }
+  return false;
+}
+function stripFence(s){
+  let t = String(s||'').trim();
+  if(t.startsWith('```')){ t = t.split('\n').slice(1).join('\n'); if(t.trim().endsWith('```')) t = t.trim().slice(0,-3); }
+  const i=t.indexOf('{'), j=t.lastIndexOf('}');
+  return (i>=0 && j>i) ? t.slice(i, j+1) : t.trim();
+}
+const sentLike = e => {
+  const toks = (String(e).match(/[A-Za-z][A-Za-z'\-]*/g)||[]);
+  return (toks.length>=4 && /[.!?]\s*$/.test(String(e).trim())) || toks.length>=6;
+};
+
+/* 浏览器直接调百炼 */
+async function vlmDirect(cfg, blob){
+  const b64 = await new Promise((res,rej)=>{
+    const fr = new FileReader();
+    fr.onload = ()=>res(String(fr.result).split(',')[1]);
+    fr.onerror = ()=>rej(new Error('图片读取失败'));
+    fr.readAsDataURL(blob);
+  });
+  const url = cfg.base.replace(/\/+$/,'') + '/compatible-mode/v1/chat/completions';
+  const r = await fetch(url, {
+    method:'POST',
+    headers:{ 'Content-Type':'application/json', 'Authorization':'Bearer '+cfg.key },
+    body: JSON.stringify({
+      model: cfg.model || 'qwen3-vl-plus',
+      messages:[{ role:'user', content:[
+        { type:'image_url', image_url:{ url:'data:'+(blob.type||'image/jpeg')+';base64,'+b64 } },
+        { type:'text', text: OCR_PROMPT }
+      ]}],
+      temperature: 0.05, max_tokens: 3000
+    })
+  });
+  if(!r.ok){
+    let detail = '';
+    try{ detail = (await r.text()).slice(0,180); }catch(e){}
+    if(r.status===401||r.status===403) throw new Error('API Key 不对或没有权限（HTTP '+r.status+'）');
+    if(r.status===429) throw new Error('调用太频繁，等一下再试');
+    throw new Error('AI 接口报错 HTTP '+r.status+' '+detail);
+  }
+  const j = await r.json();
+  let content = j && j.choices && j.choices[0] && j.choices[0].message ? j.choices[0].message.content : '';
+  if(Array.isArray(content)) content = content.map(c=>c && c.text || '').join('');
+  const data = JSON.parse(stripFence(content));
+  return data;
+}
+
+async function aiOcr(files, onProgress){
+  const direct = getApiCfg();
+  const acc = {words:[], sentences:[], model:''};
+  const total = files.length;
+  for(let i=0;i<total;i++){
+    onProgress({_stage:'shrink', _file:i+1, _total:total});
+    const blob = await shrink(files[i], direct?1600:1800, direct?0.82:0.86);
+    if(!blob) throw new Error('图片处理失败');
+    onProgress({_stage:'upload', _file:i+1, _total:total});
+    let j = null;
+    if(direct){
+      const data = await vlmDirect(direct, blob);
+      j = { ok:true, model: direct.model || 'qwen3-vl-plus',
+            words: data.words || [], sentences: data.sentences || [], ignored: data.ignored || '' };
+    }else{
+      const r = await fetch('api/ocr', {
+        method:'POST',
+        headers:{'Content-Type': blob.type || 'image/jpeg'},
+        body: blob
+      });
+      try{ j = await r.json(); }catch(e){ throw new Error('电脑端 AI 服务没有响应（HTTP '+r.status+'）'); }
+      if(!j.ok) throw new Error(j.message || j.error || 'AI 识别失败');
+    }
+    acc.words = acc.words.concat((j.words||[]).map(w=>({en:w.en, zh:w.zh||'', kind:'word'})));
+    acc.sentences = acc.sentences.concat((j.sentences||[]).map(s=>({en:s.en, zh:s.zh||'', kind:'sent'})));
+    acc.model = j.model || acc.model;
+    acc.ms = (acc.ms||0) + (j.ms||0);
+    if(j.ignored) acc.ignored = (acc.ignored ? acc.ignored + '；' : '') + j.ignored;
+  }
+  /* 本地再兜一道过滤 + 分流：
+     直连模式下服务端那两道闸不存在，所以这里必须自己来。
+     （局域网模式下重复过滤也无害，幂等） */
+  const wRaw=[], sRaw=[];
+  for(const w of acc.words){
+    if(looksLikeJunk(w.en, w.zh)) continue;
+    (sentLike(w.en) ? sRaw : wRaw).push(w);
+  }
+  for(const s of acc.sentences){
+    if(looksLikeJunk(s.en, s.zh)) continue;
+    if(String(s.en).split(/\s+/).length < 3) continue;
+    sRaw.push(s);
+  }
+
+  // 去重（跨表也算重复）
+  const seen=new Set(), W=[], Ss=[];
+  for(const w of wRaw){ const k=norm(w.en); if(k && !seen.has(k)){ seen.add(k); W.push({...w, kind:'word'}); } }
+  for(const s of sRaw){ const k=norm(s.en); if(k && !seen.has(k)){ seen.add(k); Ss.push({...s, kind:'sent'}); } }
+  acc.words=W; acc.sentences=Ss;
+  return acc;
+}
+
+/* =========================================================
+   拍照识别 · 路线二：浏览器内置 OCR（备用，识别弱）
+   ========================================================= */
+async function ocrImages(files, onProgress){
+  if(!await ensureOcrSrc()) throw new Error('OCR 引擎下载失败（可能网络不通）');
+  const w = await ensureWorker(onProgress);
+  let out='';
+  for(let i=0;i<files.length;i++){
+    onProgress({status:'recognizing', progress:0, _file:i+1, _total:files.length});
+    const r = await w.recognize(files[i]);
+    out += (r && r.data && r.data.text ? r.data.text : '') + '\n';
+    onProgress({status:'recognizing', progress:1, _file:i+1, _total:files.length});
+  }
+  return out;
+}
+
+/* =========================================================
+   路由
+   ========================================================= */
+const TITLES = {home:'英语默写小闯关', review:'核对一下内容', levels:'选择关卡',
+  play:'闯关中', result:'本关成绩', wrong:'错词本', stats:'成绩记录', crop:'裁一下，只留要的'};
+/* 每一页的「上一页」是谁 —— 保证任何页面都退得回去 */
+const PARENT = {home:null, review:'home', levels:'review', play:'levels', result:'levels', wrong:null, stats:null, crop:'home'};
+let route='home';
+let backTo='home';              // 打开错词本/成绩之前在哪一页
+function go(r){
+  if((r==='wrong'||r==='stats') && route!=='wrong' && route!=='stats') backTo = route;
+  route=r;
+  $('#barTitle').textContent = TITLES[r]||'英语默写小闯关';
+  const bb=$('#btnBack'); if(bb) bb.classList.toggle('hide', r==='home');
+  const bh=$('#btnHome'); if(bh) bh.classList.toggle('hide', r==='home');
+  window.scrollTo(0,0);
+  if(r==='play') return;
+  const fn = {home:renderHome, review:renderReview, levels:renderLevels,
+              result:renderResult, wrong:renderWrong, stats:renderStats,
+              crop:renderCropStep}[r] || renderHome;
+  fn();
+}
+function goBack(){
+  if($('#modal')){ closeModal(); return; }
+  if(route==='crop'){ cancelCrop(); return; }
+  if(route==='play'){ exitLevel(); return; }
+  if(route==='wrong'||route==='stats'){ go(backTo||'home'); return; }
+  go(PARENT[route] || 'home');
+}
+
+/* =========================================================
+   首页
+   ========================================================= */
+function renderHome(){
+  const hasW=S.words.length, hasS=S.sents.length;
+  $('#wrap').innerHTML = `
+  <div class="screen">
+    <div class="card">
+      <div class="aibadge wait" id="aiBadge">正在检查识别引擎…</div>
+      <h1>📸 拍张照，开始闯关</h1>
+      <p class="sub">把课本上的单词和句子拍下来（或拍照后粘贴文字），自动变成 6 个小游戏，最后练到手写默写。</p>
+      <div class="drop" id="dropZone">
+        <div class="big">📷</div>
+        <div class="t">点这里拍照 / 选图片</div>
+        <div class="s">可以一次选多张 &nbsp;·&nbsp; 拍清楚一点，字占大一点</div>
+      </div>
+      <div class="row" style="margin-top:10px">
+        <button class="btn sm ghost" id="btnCam">📷 直接拍照</button>
+        <button class="btn sm ghost" id="btnAlbum">🖼️ 从相册选</button>
+      </div>
+      <input type="file" id="fileCam" accept="image/*" capture="environment" multiple class="hide">
+      <input type="file" id="fileAlbum" accept="image/*" multiple class="hide">
+      <div class="ocr-bar hide" id="ocrBar">
+        <div class="progress"><i id="ocrFill"></i></div>
+        <div class="ocr-msg" id="ocrMsg">准备中…</div>
+        <div class="row wrap2" id="ocrActions" style="margin-top:10px"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>✍️ 或者直接把文字粘进来</h2>
+      <p class="sub">格式随便：<b>apple 苹果</b> / <b>apple　苹果</b> / <b>apple - 苹果</b> 都行，一行一个。整句也行，系统自己分。</p>
+      <textarea id="rawText" placeholder="apple 苹果&#10;banana 香蕉&#10;I like apples. 我喜欢苹果。&#10;She goes to school by bus. 她坐公交车上学。"></textarea>
+      <div class="row" style="margin-top:10px">
+        <button class="btn primary" id="btnParse">开始 → 拆成单词和句子</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>🎚️ 孩子几年级</h2>
+      <div class="chips" id="gradeChips">
+        <button class="chip" data-g="3">三年级（题目简单些）</button>
+        <button class="chip" data-g="5">五年级（题目难一些）</button>
+      </div>
+      <p class="sub" style="margin:10px 0 0">${Store.grade===5?'五年级：干扰项更接近、句子更长、默写不给首字母提示。':'三年级：动画多一点、默写给首字母提示、句子短一些。'}</p>
+    </div>
+
+    ${(hasW||hasS)?`<div class="card">
+      <h2>▶️ 上次的内容还在</h2>
+      <p class="sub">已经把 ${hasW} 个单词、${hasS} 个句子准备好了。</p>
+      <button class="btn green" id="btnContinue">继续用这份内容闯关</button>
+    </div>`:''}
+  </div>`;
+
+  const pick = (inp)=>{ inp.value=''; inp.click(); };
+  $('#dropZone').onclick = ()=>pick($('#fileCam'));
+  $('#btnCam').onclick  = ()=>pick($('#fileCam'));
+  $('#btnAlbum').onclick= ()=>pick($('#fileAlbum'));
+  $('#fileCam').onchange   = e=>handleFiles(e.target.files);
+  $('#fileAlbum').onchange = e=>handleFiles(e.target.files);
+  $('#btnParse').onclick = ()=>{
+    const t = $('#rawText').value;
+    if(!/[A-Za-z]/.test(t)){ toast('还没有英文内容哦'); return; }
+    applyParse(t, true);
+  };
+  if($('#btnContinue')) $('#btnContinue').onclick = ()=>{ go('levels'); };
+  $$('#gradeChips .chip').forEach(c=>{
+    if(+c.dataset.g===Store.grade) c.classList.add('on');
+    c.onclick = ()=>{ Store.grade=+c.dataset.g; save(K.grade,Store.grade); renderHome(); };
+  });
+  refreshAiBadge();
+}
+
+async function refreshAiBadge(){
+  const paint = ()=>{
+    const el = $('#aiBadge'); if(!el) return;
+    el.onclick = null;
+    if(AI_STATE==='ready'){
+      el.className='aibadge ok';
+      el.innerHTML='🧠 <b>AI 识别已就绪</b>（电脑上的服务）—— 拍完 5~15 秒出结果，中文也准';
+    }else if(AI_STATE==='direct'){
+      el.className='aibadge ok';
+      el.innerHTML='🧠 <b>AI 识别已就绪</b>（本机直连）—— 拍完 5~15 秒出结果，中文也准';
+    }else if(AI_STATE==='degraded'){
+      el.className='aibadge warn';
+      el.innerHTML='⚠️ <b>上一次 AI 识别失败了</b>：'+esc(AI_LAST_ERROR||'未知原因')+
+        '<br>拍照片时我会<b>再试一次</b>；<u>点这里现在就重测</u>';
+      el.onclick=()=>{ AI_STATE='unknown'; paint(); refreshAiBadge(); };
+    }else if(AI_STATE==='none'){
+      el.className='aibadge warn';
+      el.innerHTML='⚠️ <b>还没配 AI 识别</b>'+(AI_LAST_ERROR?('（'+esc(AI_LAST_ERROR)+'）'):'')+
+        '<br><u>点这里填一次 API Key</u>，或用电脑上的服务';
+      el.onclick=()=>{ openKeySetup(); };
+    }else{
+      el.className='aibadge wait';
+      el.innerHTML='正在检查识别引擎…';
+    }
+  };
+  paint();
+  if(AI_STATE==='unknown'){ await checkAi(); paint(); }
+}
+
+/* 公网页面用：在这台设备上填一次 API Key（存在本机，不进网页源码） */
+function openKeySetup(){
+  const cur = getApiCfg();
+  showModal('配置 AI 识别',
+    '把百炼的 API Key 粘进来，点保存就行。\n只存在**这台设备**的浏览器里，不会上传、不会写进网页。',
+    []);
+  const box = document.querySelector('#modal .mbox');
+  if(!box) return;
+  const row = document.createElement('div');
+  row.innerHTML = `
+    <input id="keyIn" type="text" autocomplete="off" autocapitalize="off" spellcheck="false"
+      value="${cur?esc(cur.key):''}" placeholder="sk-..."
+      style="width:100%;border:2px solid var(--line);border-radius:12px;padding:11px;font-size:14px;margin-bottom:10px">
+    <input id="baseIn" type="text" autocomplete="off" autocapitalize="off" spellcheck="false"
+      value="${cur?esc(cur.base):''}" placeholder="留空 = 用默认百炼地址"
+      style="width:100%;border:2px solid var(--line);border-radius:12px;padding:11px;font-size:13px;margin-bottom:12px">`;
+  box.insertBefore(row, box.querySelector('.mrow'));
+  const btns = box.querySelector('.mrow');
+  btns.innerHTML = '';
+  const mk = (t, cls, fn)=>{ const b=document.createElement('button'); b.className='btn sm '+cls; b.textContent=t; b.onclick=fn; btns.appendChild(b); };
+  mk('取消','ghost',closeModal);
+  if(cur) mk('清除 Key','ghost',()=>{ clearApiCfg(); closeModal(); refreshAiBadge(); toast('已清除，改用电脑上的服务'); });
+  mk('保存并启用','primary',async ()=>{
+    const k = ($('#keyIn').value||'').trim();
+    const b = ($('#baseIn').value||'').trim();
+    if(!k){ toast('把 Key 粘进来'); return; }
+    setApiCfg(b, k);
+    closeModal();
+    toast('已保存，正在验证…', 1200);
+    await refreshAiBadge();
+    if(AI_STATE==='direct') toast('AI 识别已启用 ✅');
+  });
+}
+
+/* 一次性配置链接： …/#k=你的key  或  …/#k=key&u=base_url  */
+function applyHashConfig(){
+  const h = (location.hash||'').replace(/^#/,'');
+  if(!h) return false;
+  const p = new URLSearchParams(h);
+  const k = p.get('k');
+  if(!k) return false;
+  setApiCfg(p.get('u')||'', k);
+  try{ history.replaceState(null,'',location.pathname + location.search); }catch(e){ location.hash=''; }
+  return true;
+}
+
+/* =========================================================
+   上传前裁切：先把不要的部分框掉，再送去识别
+   ========================================================= */
+const Crop = { queue:[], idx:0, out:[], box:{x:0,y:0,w:0,h:0}, url:null };
+
+function handleFiles(files){
+  if(!files || !files.length) return;
+  if(ocrBusy){ toast('正在识别，稍等一下'); return; }
+  Crop.queue = [...files];
+  Crop.idx = 0;
+  Crop.out = [];
+  go('crop');
+}
+function cleanupCropUrl(){
+  if(Crop.url){ try{ URL.revokeObjectURL(Crop.url); }catch(e){} Crop.url=null; }
+}
+function cancelCrop(){
+  cleanupCropUrl();
+  Crop.queue=[]; Crop.out=[];
+  go('home');
+}
+function cropAdvance(){
+  cleanupCropUrl();
+  Crop.idx++;
+  if(Crop.idx >= Crop.queue.length) return cropFinish();
+  renderCropStep();
+}
+function cropSkipRest(){
+  cropToBlob(true).then(blob=>{
+    if(blob) Crop.out.push(blob);
+    while(Crop.idx < Crop.queue.length){ Crop.out.push(Crop.queue[Crop.idx]); Crop.idx++; }
+    cropFinish();
+  });
+}
+function cropFinish(){
+  cleanupCropUrl();
+  const list = Crop.out.slice();
+  Crop.queue=[]; Crop.out=[];
+  if(!list.length){ toast('没有可识别的内容'); go('home'); return; }
+  ocrBusy = true;
+  doRecognize(list).finally(()=>{ ocrBusy = false; });
+}
+async function cropToBlob(useAll){
+  const img = $('#cropImg');
+  if(!img || !img.naturalWidth) return null;
+  const dw = img.offsetWidth, dh = img.offsetHeight;
+  const s  = img.naturalWidth / dw;
+  const b  = useAll ? {x:0,y:0,w:dw,h:dh} : Crop.box;
+  const sx = Math.max(0, Math.round(b.x*s)), sy = Math.max(0, Math.round(b.y*s));
+  const sw = Math.max(1, Math.min(Math.round(b.w*s), img.naturalWidth  - sx));
+  const sh = Math.max(1, Math.min(Math.round(b.h*s), img.naturalHeight - sy));
+  const c = document.createElement('canvas');
+  c.width = sw; c.height = sh;
+  const ctx = c.getContext('2d');
+  ctx.fillStyle='#fff'; ctx.fillRect(0,0,sw,sh);
+  ctx.drawImage(img, sx, sy, sw, sh, 0, 0, sw, sh);
+  return await new Promise(res=>{ c.toBlob(x=>res(x||null), 'image/jpeg', 0.9); });
+}
+
+function renderCropStep(){
+  const f = Crop.queue[Crop.idx];
+  if(!f){ cropFinish(); return; }
+  cleanupCropUrl();
+  Crop.url = URL.createObjectURL(f);
+  const n = Crop.queue.length;
+
+  $('#wrap').innerHTML = `<div class="screen">
+    <div class="card">
+      <h2>✂️ 只留要用的部分</h2>
+      <p class="sub">拖动方框：把页眉、题目要求、插图、别的科目都框在外面。<b>框里留下的才会送去识别。</b></p>
+      ${n>1?`<div class="cropthumbs">${Crop.queue.map((_,i)=>`<span class="${i===Crop.idx?'on':''}">第 ${i+1} 张</span>`).join('')}</div>`:''}
+    </div>
+    <div class="cropstage">
+      <div class="cropwrap" id="cropWrap">
+        <img id="cropImg" src="${Crop.url}" alt="">
+        <div class="cropbox" id="cropBox">
+          <i data-h="nw"></i><i data-h="ne"></i><i data-h="sw"></i><i data-h="se"></i>
+        </div>
+      </div>
+    </div>
+    <div class="row" style="margin-top:14px">
+      <button class="btn ghost" id="cropAll">用整张</button>
+      <button class="btn primary" id="cropOk">✅ 就裁这里</button>
+    </div>
+    ${n>1?`<button class="btn sm ghost" id="cropSkipRest" style="margin-top:10px">后面的都不裁，直接识别</button>`:''}
+    <button class="btn sm ghost" id="cropCancel" style="margin-top:10px">取消，重新选照片</button>
+  </div>`;
+
+  const img=$('#cropImg'), box=$('#cropBox');
+  function paint(){
+    const W=img.offsetWidth, H=img.offsetHeight; if(!W) return;
+    const b=Crop.box;
+    b.w = Math.max(60, Math.min(b.w, W));
+    b.h = Math.max(60, Math.min(b.h, H));
+    b.x = Math.max(0, Math.min(b.x, W-b.w));
+    b.y = Math.max(0, Math.min(b.y, H-b.h));
+    box.style.left=b.x+'px'; box.style.top=b.y+'px';
+    box.style.width=b.w+'px'; box.style.height=b.h+'px';
+  }
+  const init = ()=>{ const W=img.offsetWidth,H=img.offsetHeight; if(!W) return;
+    Crop.box={x:0,y:0,w:W,h:H}; paint(); };
+  if(img.complete && img.naturalWidth) init(); else img.onload = init;
+
+  let drag=null;
+  box.addEventListener('pointerdown', e=>{
+    const h = (e.target.dataset && e.target.dataset.h) || 'move';
+    drag = {mode:h, sx:e.clientX, sy:e.clientY, ox:Crop.box.x, oy:Crop.box.y, ow:Crop.box.w, oh:Crop.box.h};
+    try{ box.setPointerCapture(e.pointerId); }catch(_){}
+    e.preventDefault(); e.stopPropagation();
+  });
+  box.addEventListener('pointermove', e=>{
+    if(!drag) return;
+    const dx=e.clientX-drag.sx, dy=e.clientY-drag.sy, b=Crop.box;
+    if(drag.mode==='move'){ b.x=drag.ox+dx; b.y=drag.oy+dy; }
+    else{
+      let x=drag.ox, y=drag.oy, w=drag.ow, h=drag.oh;
+      if(drag.mode[0]==='n'){ y=drag.oy+dy; h=drag.oh-dy; }
+      if(drag.mode[0]==='s'){ h=drag.oh+dy; }
+      if(drag.mode[1]==='w'){ x=drag.ox+dx; w=drag.ow-dx; }
+      if(drag.mode[1]==='e'){ w=drag.ow+dx; }
+      if(w>=60){ b.x=x; b.w=w; }
+      if(h>=60){ b.y=y; b.h=h; }
+    }
+    paint(); e.preventDefault();
+  });
+  const endDrag = ()=>{ drag=null; };
+  box.addEventListener('pointerup', endDrag);
+  box.addEventListener('pointercancel', endDrag);
+  box.addEventListener('lostpointercapture', endDrag);
+
+  $('#cropAll').onclick = async ()=>{ const b=await cropToBlob(true);  if(b) Crop.out.push(b); cropAdvance(); };
+  $('#cropOk').onclick  = async ()=>{ const b=await cropToBlob(false); if(b) Crop.out.push(b); cropAdvance(); };
+  $('#cropCancel').onclick = cancelCrop;
+  if($('#cropSkipRest')) $('#cropSkipRest').onclick = cropSkipRest;
+}
+
+async function doRecognize(files){
+  // 裁切/核对等页面里没有首页那条进度条 —— 先回到首页，否则一取就是 null
+  if(!$('#ocrBar')) go('home');
+  const bar=$('#ocrBar'), fill=$('#ocrFill'), msg=$('#ocrMsg'), acts=$('#ocrActions');
+  bar.classList.remove('hide');
+  if(acts) acts.innerHTML='';
+  fill.style.width='3%';
+  const list = [...files];
+
+  /* ---------- 永远先试 AI ----------
+     不在页面打开那一刻就把路堵死：那一刻服务可能正好没起来/在重启，
+     旧写法会因此把整页永久判成「没有 AI」，然后偷偷用弱引擎糊弄，
+     用户看到的就是一堆乱码还不知道为什么。 */
+  try{
+    msg.textContent = '正在压缩照片…';
+    const r = await aiOcr(list, m=>{
+      if(m._stage==='shrink'){ msg.textContent='正在压缩照片 '+m._file+'/'+m._total+'…'; fill.style.width=(10+m._file/m._total*15)+'%'; }
+      else if(m._stage==='upload'){ msg.textContent='AI 正在读图 '+m._file+'/'+m._total+'…（约 5-10 秒）'; fill.style.width=(30+m._file/m._total*60)+'%'; }
+    });
+    if(!r.words.length && !r.sentences.length) throw new Error('图片里没读出英文内容');
+    S.words = r.words.map(w=>({...w, on:true}));
+    S.sents = r.sentences.map(s=>({...s, on:true, key:pickKey(s.en)}));
+    $('#rawText').value = [
+      ...r.words.map(w=>w.en + (w.zh? '  '+w.zh : '')),
+      ...r.sentences.map(s=>s.en + (s.zh? '  '+s.zh : ''))
+    ].join('\n');
+    fill.style.width='100%';
+    msg.innerHTML = '✅ AI 识别完成 &nbsp;·&nbsp; 单词 <b>'+r.words.length+'</b> 个，句子 <b>'+r.sentences.length+'</b> 句';
+    setTimeout(()=>bar.classList.add('hide'), 900);
+    toast('识别完成');
+    S.done = {};
+    S.ignored = r.ignored || '';
+    AI_STATE='ready'; AI_LAST_ERROR='';
+    clearRun(); saveSession();
+    go('review');
+    return;
+  }catch(err){
+    AI_STATE = 'degraded';
+    AI_LAST_ERROR = (err && err.message) ? err.message : String(err);
+  }
+
+  /* ---------- AI 没成功：明说，让你选，绝不偷偷用弱引擎 ---------- */
+  fill.style.width='100%';
+  msg.innerHTML =
+    '<b style="color:#B91C1C">❌ AI 识别没成功</b><br>' +
+    '<span style="font-size:12.5px">' + esc(AI_LAST_ERROR) + '</span>';
+  if(acts){
+    acts.innerHTML =
+      '<button class="btn sm amber" id="ocrRetry">🔁 再试一次</button>' +
+      '<button class="btn sm ghost" id="ocrManual">✍️ 手动粘贴文字</button>';
+    $('#ocrRetry').onclick = ()=>{ bar.classList.add('hide'); acts.innerHTML=''; ocredPick(); };
+    $('#ocrManual').onclick = ()=>{
+      bar.classList.add('hide'); acts.innerHTML='';
+      const t=$('#rawText'); t.focus(); t.scrollIntoView({block:'center'});
+      toast('在下面的框里粘贴文字，再点「开始」');
+    };
+    const warn = document.createElement('button');
+    warn.className='btn sm ghost';
+    warn.style.cssText='grid-column:1/-1;font-size:13px;color:#92400E;border-color:#FCD34D;background:#FFFBEB';
+    warn.textContent='⚠️ 还是用备用识别（中文经常乱码，不推荐）';
+    warn.onclick = ()=>{ acts.innerHTML=''; runFallback(list); };
+    acts.appendChild(warn);
+  }
+  fill.style.width='0%';
+  toast('AI 识别失败，请看下面的选项');
+}
+
+function ocredPick(){
+  const inp = $('#fileCam');
+  if(inp){ inp.value=''; inp.click(); }
+}
+
+/* ---------- 备用识别：只在用户明确点了才用 ---------- */
+async function runFallback(list){
+  const bar=$('#ocrBar'), fill=$('#ocrFill'), msg=$('#ocrMsg');
+  bar.classList.remove('hide');
+  fill.style.width='5%';
+  try{
+    msg.textContent='正在启动备用识别…（第一次要加载约 4.5MB）';
+    const text = await ocrImages(list, m=>{
+      if(!m) return;
+      if(m.status==='loading tesseract core'){ msg.textContent='加载识别核心…'; fill.style.width='12%'; }
+      else if(m.status==='loading language traineddata'){ msg.textContent='加载语言包… '+Math.round((m.progress||0)*100)+'%'; fill.style.width=(15+(m.progress||0)*45)+'%'; }
+      else if(m.status==='initializing api'){ msg.textContent='初始化…'; fill.style.width='65%'; }
+      else if(m.status==='recognizing text'){
+        const f = m._file?('第 '+m._file+'/'+m._total+' 张 '):'';
+        msg.textContent='正在识别 '+f+Math.round((m.progress||0)*100)+'%';
+        fill.style.width=(70+(m.progress||0)*29)+'%';
+      }
+      else if(m.status==='retry'){ msg.textContent='正在准备识别…'; }
+    });
+    fill.style.width='100%';
+    msg.innerHTML='备用识别完成 <span style="color:#B45309">（中文可能不准，请仔细核对）</span>';
+    const cur = $('#rawText').value.trim();
+    $('#rawText').value = (cur? cur+'\n':'') + text.trim();
+    setTimeout(()=>bar.classList.add('hide'), 1500);
+    toast('备用识别完成，请核对');
+  }catch(err){
+    fill.style.width='100%';
+    msg.innerHTML = '<b style="color:#B91C1C">备用识别也没成功</b>：' + esc(err.message||'网络问题') +
+      '<br>用 iPad 长按图片「拷贝文字」，粘到下面的框里，一样能用。';
+    toast('识别失败，可手动粘贴文字');
+  }
+}
+
+function applyParse(text, preview){
+  const r = parseBlocks(text);
+  if(!r.words.length && !r.sents.length){ toast('没识别出英文内容，检查一下'); return; }
+  S.words = r.words.map(w=>({...w,on:true}));
+  S.sents = r.sents.map(s=>({...s,on:true,key:pickKey(s.en)}));
+  S.done = {};
+  clearRun(); saveSession();
+  if(preview){ go('review'); }
+}
+
+/* =========================================================
+   核对页
+   ========================================================= */
+function renderReview(){
+  const W=S.words, Ss=S.sents;
+  $('#wrap').innerHTML = `
+  <div class="screen">
+    <div class="card">
+      <h2>📄 识别出来的原文</h2>
+      <p class="sub">哪里不对就直接改这里，改完点「重新拆分」。一行一个词或一句话。</p>
+      <textarea id="rawText2" style="width:100%;min-height:110px;border-radius:14px;border:2px solid var(--line);padding:11px;font-size:14px;line-height:1.7">${esc($('#rawText') ? $('#rawText').value : '')}</textarea>
+      <button class="btn sm ghost" id="btnReparse" style="margin-top:10px">🔄 重新拆分</button>
+      ${S.ignored?`<p class="sub" style="margin:10px 0 0;color:#B45309">🤖 已自动忽略：${esc(S.ignored)}</p>`:''}
+    </div>
+    <div class="card">
+      <h2>📝 单词（${W.filter(w=>w.on).length}/${W.length}）</h2>
+      <p class="sub">英文或中文写错了，直接点上去改。不要的按 ✕。</p>
+      <div id="wList">${W.map((w,i)=>wordRow(w,i)).join('') || '<p class="sub">没有单词</p>'}</div>
+      <button class="btn sm ghost" id="addW">＋ 加一个单词</button>
+    </div>
+    <div class="card">
+      <h2>💬 句子（${Ss.filter(s=>s.on).length}/${Ss.length}）</h2>
+      <p class="sub">每句下面写着会挖掉哪个词。英文或中文错了，直接点上去改。</p>
+      <div id="sList">${Ss.map((s,i)=>sentRow(s,i)).join('') || '<p class="sub">没有句子</p>'}</div>
+      <button class="btn sm ghost" id="addS">＋ 加一个句子</button>
+    </div>
+    <button class="btn amber" id="btnGo">开始闯关 🚀</button>
+  </div>`;
+
+  $$('#wList input[type=text]').forEach(inp=>{
+    inp.oninput = ()=>{ const i=+inp.dataset.i, f=inp.dataset.f; S.words[i][f]=inp.value.trim(); saveSession(); };
+  });
+  $$('#wList .del').forEach(b=>b.onclick=()=>{ S.words.splice(+b.dataset.i,1); saveSession(); renderReview(); });
+  $$('#wList .mv').forEach(b=>b.onclick=()=>{
+    const w = S.words.splice(+b.dataset.i,1)[0]; if(!w) return;
+    S.sents.push({en:w.en, zh:w.zh, kind:'sent', on:true, key:pickKey(w.en)});
+    saveSession(); renderReview(); toast('已移到句子区');
+  });
+  $$('#wList .pick').forEach(c=>c.onchange=()=>{ S.words[+c.dataset.i].on=c.checked; saveSession(); renderReview(); });
+
+  $$('#sList input[type=text]').forEach(inp=>{
+    inp.oninput = ()=>{ const i=+inp.dataset.i, f=inp.dataset.f; S.sents[i][f]=inp.value.trim();
+      if(f==='en'){ S.sents[i].key=pickKey(inp.value); } saveSession(); };
+  });
+  $$('#sList .del').forEach(b=>b.onclick=()=>{ S.sents.splice(+b.dataset.i,1); saveSession(); renderReview(); });
+  $$('#sList .mv').forEach(b=>b.onclick=()=>{
+    const s = S.sents.splice(+b.dataset.i,1)[0]; if(!s) return;
+    S.words.push({en:s.en, zh:s.zh, kind:'word', on:true});
+    saveSession(); renderReview(); toast('已移到单词区');
+  });
+  $$('#sList .pick').forEach(c=>c.onchange=()=>{ S.sents[+c.dataset.i].on=c.checked; saveSession(); renderReview(); });
+
+  $('#addW').onclick = ()=>{ S.words.push({en:'new word',zh:'新词',kind:'word',on:true}); saveSession(); renderReview(); };
+  $('#addS').onclick = ()=>{ S.sents.push({en:'I am a new sentence.',zh:'我是一个新句子。',kind:'sent',on:true,key:'sentence'}); saveSession(); renderReview(); };
+  $('#btnReparse').onclick = ()=>{
+    const t = $('#rawText2').value;
+    if(!/[A-Za-z]/.test(t)){ toast('还没有英文内容'); return; }
+    if($('#rawText')) $('#rawText').value = t;
+    applyParse(t, false);
+    renderReview();
+    toast('已重新拆分');
+  };
+  $('#btnGo').onclick = ()=>{
+    if(!S.words.some(w=>w.on) && !S.sents.some(s=>s.on)){ toast('至少要留一个单词或句子'); return; }
+    S.done={}; clearRun(); saveSession(); go('levels');
+  };
+}
+function wordRow(w,i){
+  return `<div class="item">
+    <input type="checkbox" class="pick" data-i="${i}" ${w.on?'checked':''} style="width:22px;height:22px;accent-color:#2563EB">
+    <input type="text" class="en" data-i="${i}" data-f="en" value="${esc(w.en)}">
+    <input type="text" class="zh" data-i="${i}" data-f="zh" value="${esc(w.zh)}" placeholder="中文…">
+    <button class="mv" data-i="${i}" title="这其实是句子 → 移到句子区">⇄</button>
+    <button class="del" data-i="${i}">✕</button>
+  </div>`;
+}
+function sentRow(s,i){
+  return `<div class="item" style="align-items:flex-start">
+    <input type="checkbox" class="pick" data-i="${i}" ${s.on?'checked':''} style="width:22px;height:22px;margin-top:8px;accent-color:#2563EB">
+    <div style="flex:1;min-width:0">
+      <input type="text" data-i="${i}" data-f="en" value="${esc(s.en)}"
+        style="width:100%;font-size:15.5px;font-weight:700;color:#1F2937;padding:4px 2px">
+      <input type="text" data-i="${i}" data-f="zh" value="${esc(s.zh)}" placeholder="中文意思…"
+        style="width:100%;font-size:13.5px;font-weight:600;color:#1D4ED8;padding:4px 2px">
+      <div style="font-size:11.5px;color:#94A3B8;margin-top:3px">句子填空会挖掉：<b style="color:#B45309">${esc(s.key||'—')}</b></div>
+    </div>
+    <button class="mv" data-i="${i}" title="这其实是单词/词组 → 移到单词区">⇄</button>
+    <button class="del" data-i="${i}">✕</button>
+  </div>`;
+}
+
+/* =========================================================
+   关卡列表
+   ========================================================= */
+const LEVELS = [
+  {id:'choose', icon:'🎯', nm:'看中文选英文', ds:'4 选 1 · 认词', kind:'word'},
+  {id:'spell',  icon:'🧩', nm:'字母拼图',     ds:'把打乱的字母拼回去', kind:'word'},
+  {id:'listen', icon:'👂', nm:'听音选词',     ds:'听发音，选出正确的词', kind:'word'},
+  {id:'cloze',  icon:'✏️', nm:'句子填空',     ds:'挖掉关键词，选词填进去', kind:'sent'},
+  {id:'order',  icon:'🔀', nm:'句子排序',     ds:'把打乱的单词排成句子', kind:'sent'},
+  {id:'write',  icon:'🏆', nm:'默写挑战',     ds:'看中文 → 手写 / 打字写出英文', kind:'final'},
+];
+function activeLevels(){
+  const w=S.words.filter(x=>x.on), s=S.sents.filter(x=>x.on);
+  const out=[];
+  if(w.length>=2){ out.push('choose','spell'); if(w.length>=3) out.push('listen'); }
+  else if(w.length===1){ out.push('spell'); }
+  if(s.length>=2){ out.push('cloze','order'); }
+  if(w.length||s.length) out.push('write');
+  return LEVELS.filter(l=>out.includes(l.id));
+}
+function renderLevels(){
+  const lv = activeLevels();
+  const wc = S.words.filter(x=>x.on).length, sc = S.sents.filter(x=>x.on).length;
+  const mid = (Run.id && Run.qs && Run.qs.length && Run.i < Run.qs.length);
+  const midLv = mid ? (LEVELS.find(l=>l.id===Run.id)||{nm:'这一关'}).nm : '';
+  $('#wrap').innerHTML = `
+  <div class="screen">
+    ${mid?`<div class="card" style="border:2.5px solid #86EFAC;background:#F0FDF4">
+      <h2>▶️ 接着上次做</h2>
+      <p class="sub">${esc(midLv)} &nbsp;·&nbsp; 做到第 <b>${Run.i+1}</b> / ${Run.qs.length} 题 &nbsp;·&nbsp; 已答对 <b>${Run.right}</b> 题</p>
+      <button class="btn green" id="btnResume">继续做这一关</button>
+    </div>`:''}
+    <div class="card">
+      <h2>今天要练的内容</h2>
+      <p class="sub">📚 <b>${wc}</b> 个单词 &nbsp;·&nbsp; 💬 <b>${sc}</b> 个句子 &nbsp;·&nbsp; 共 <b>${lv.length}</b> 关</p>
+      <div class="row">
+        <button class="btn sm ghost" id="btnEdit">✏️ 改内容</button>
+        <button class="btn sm ghost" id="btnNew">📸 换一批</button>
+      </div>
+    </div>
+    ${lv.map((l,i)=>{
+      const st = S.done[l.id];
+      return `<div class="level ${st!=null?'done':''}" data-id="${l.id}">
+        <div class="ic">${l.icon}</div>
+        <div class="mid">
+          <div class="nm">第 ${i+1} 关 · ${l.nm}</div>
+          <div class="ds">${l.ds}</div>
+          ${st!=null&&st>0?`<div class="stars-line">${'⭐'.repeat(st)}</div>`:''}
+        </div>
+        <div class="go">${st!=null?'✅':'›'}</div>
+      </div>`;
+    }).join('')}
+    <p class="sub center" style="margin-top:14px">建议顺序玩下来，最后一关「默写挑战」就是真正的目标 💪</p>
+  </div>`;
+  $$('.level').forEach(el=>el.onclick=()=>startLevel(el.dataset.id));
+  if($('#btnResume')) $('#btnResume').onclick = ()=>{ go('play'); renderQ(); };
+  $('#btnEdit').onclick = ()=>go('review');
+  $('#btnNew').onclick  = ()=>{ S.words=[]; S.sents=[]; S.done={}; clearRun(); saveSession(); go('home'); };
+}
+
+/* =========================================================
+   出题
+   ========================================================= */
+const CAP = 10;
+function take(arr,n){ const s=shuffle(arr); return s.slice(0, Math.min(n, s.length)); }
+function distractors(correct, pool, n){
+  const c = norm(correct);
+  const cand = uniq(pool.map(x=>x).filter(x=>norm(x)!==c && x && norm(x).length>0));
+  const pick = shuffle(cand).slice(0,n);
+  while(pick.length<n){
+    const p = POOL[Math.random()*POOL.length|0];
+    if(norm(p)!==c && !pick.some(x=>norm(x)===norm(p))) pick.push(p);
+  }
+  return pick;
+}
+function buildQuestions(levelId){
+  const W = S.words.filter(x=>x.on && x.en);
+  const Ss= S.sents.filter(x=>x.on && x.en);
+  const wPool = W.map(x=>x.en);
+  const sPool = Ss.map(x=>x.key).filter(Boolean);
+  const hard = Store.grade>=5;
+
+  if(levelId==='choose'){
+    return take(W,CAP).map(w=>{
+      const opts = shuffle([w.en, ...distractors(w.en, wPool, 3)]);
+      return {kind:'choose', zh:w.zh||'（没有中文）', answer:w.en, options:opts, entry:w};
+    });
+  }
+  if(levelId==='spell'){
+    return take(W, hard?CAP:8).map(w=>({kind:'spell', zh:w.zh||'（没有中文）', answer:w.en, entry:w}));
+  }
+  if(levelId==='listen'){
+    return take(W,CAP).map(w=>{
+      const opts = shuffle([w.en, ...distractors(w.en, wPool, 3)]);
+      return {kind:'listen', answer:w.en, options:opts, zh:w.zh||'', entry:w};
+    });
+  }
+  if(levelId==='cloze'){
+    return take(Ss.filter(s=>s.key), hard?8:6).map(s=>{
+      const k = s.key;
+      const opts = shuffle([k, ...distractors(k, [...sPool, ...wPool], 3)]);
+      return {kind:'cloze', answer:k, options:opts, zh:s.zh||'', full:s.en, entry:s};
+    });
+  }
+  if(levelId==='order'){
+    return take(Ss, hard?8:6).map(s=>{
+      let toks = (s.en.match(/[A-Za-z0-9'\-]+|[.,!?;:]/g)||[]);
+      const words = toks.filter(t=>/[A-Za-z0-9]/.test(t));
+      return {kind:'order', answer:s.en, tokens:shuffle(words), words, zh:s.zh||'', entry:s};
+    }).filter(q=>q.words.length>=2);
+  }
+  if(levelId==='write'){
+    const qs=[];
+    take(W, Math.min(CAP, W.length)).forEach(w=>qs.push({kind:'write', type:'word', zh:w.zh||'（没有中文）', answer:w.en, entry:w}));
+    take(Ss, Math.min(hard?6:4, Ss.length)).forEach(s=>qs.push({kind:'write', type:'sent', zh:s.zh||'（没有中文）', answer:s.en, entry:s}));
+    return shuffle(qs);
+  }
+  return [];
+}
+
+/* =========================================================
+   闯关引擎
+   ========================================================= */
+const Run = {id:null, qs:[], i:0, stars:0, right:0, combo:0, locked:false, tries:0};
+const MAX_TRIES = 3;
+
+/* =========================================================
+   断点续做：内容、完成情况、正在做的那一关，全部落盘
+   （误触返回、Safari 自己刷新、切换 App 回来，都不会丢）
+   ========================================================= */
+const KS = {session:'dxxg.session', run:'dxxg.run'};
+function saveSession(){
+  save(KS.session, {words:S.words, sents:S.sents, done:S.done});
+}
+function restoreSession(){
+  const d = load(KS.session, null);
+  if(!d) return false;
+  const w = Array.isArray(d.words)?d.words:[];
+  const s = Array.isArray(d.sents)?d.sents:[];
+  if(!w.length && !s.length) return false;
+  S.words = w; S.sents = s; S.done = d.done || {};
+  return true;
+}
+function saveRun(){
+  if(!Run.id || !Run.qs || !Run.qs.length || Run.i >= Run.qs.length){ save(KS.run, null); return; }
+  save(KS.run, {id:Run.id, qs:Run.qs, i:Run.i, stars:Run.stars, right:Run.right});
+}
+function restoreRun(){
+  const d = load(KS.run, null);
+  if(!d || !d.id || !Array.isArray(d.qs) || !d.qs.length) return false;
+  if(!(d.i >= 0) || d.i >= d.qs.length) return false;
+  Run.id=d.id; Run.qs=d.qs; Run.i=d.i; Run.stars=d.stars||0; Run.right=d.right||0;
+  Run.combo=0; Run.locked=false;
+  return true;
+}
+function clearRun(){ Run.id=null; Run.qs=[]; Run.i=0; Run.stars=0; Run.right=0; save(KS.run, null); }
+
+/* 中途退出：说清楚进度会保留，给三个明确选择 */
+function exitLevel(){
+  if(!Run.id || Run.i>=Run.qs.length){ clearRun(); go('levels'); return; }
+  const lv = LEVELS.find(l=>l.id===Run.id) || {nm:'这一关'};
+  showModal('要休息一下吗？',
+    `${lv.nm}　做到第 ${Run.i+1} / ${Run.qs.length} 题\n进度会保留，下次点「继续」就能接着做。`,
+    [
+      {t:'继续做', primary:true},
+      {t:'保存并退出', fn:()=>{ saveRun(); go('levels'); toast('进度已保留'); }},
+      {t:'不要这关了', danger:true, fn:()=>{ clearRun(); S.done[Run.id]=undefined; go('levels'); }}
+    ]);
+}
+function startLevel(id, overrideQs){
+  const qs = overrideQs || buildQuestions(id);
+  if(!qs.length){ toast('这一关还没有足够的题目'); return; }
+  S.lastWrong = [];
+  Run.id=id; Run.qs=qs; Run.i=0; Run.stars=0; Run.right=0; Run.combo=0; Run.locked=false;
+  saveSession();                 // 兜底：连内容一起落盘，断点才不会指向不存在的内容
+  go('play');
+  renderQ();
+}
+function playHeader(extra){
+  const lv = LEVELS.find(l=>l.id===Run.id)||{icon:'🎮',nm:''};
+  return `<div class="pbar">
+    <button class="bar-btn" id="qBack">←</button>
+    <div class="progress"><i style="width:${(Run.i/Run.qs.length*100).toFixed(1)}%"></i></div>
+    <div class="cnt">${Run.i+1}/${Run.qs.length} · ⭐${Run.stars}</div>
+  </div>
+  <div class="center" style="margin-bottom:10px;font-size:13px;color:#6B7280;font-weight:800">${lv.icon} ${lv.nm}</div>
+  ${extra||''}`;
+}
+function renderQ(){
+  const q = Run.qs[Run.i];
+  Run.locked=false;
+  Run.tries=0;                                 // 每道题 3 次机会，重新开始数
+  stopSpeak();                                 // 换题先掐断上一条语音，绝不让它串到下一题
+  saveRun();                                   // 每换一题就落盘，误触返回也丢不了
+  ({choose:vChoose, spell:vSpell, listen:vListen, cloze:vCloze, order:vOrder, write:vWrite}[q.kind])(q);
+}
+function bindBack(){
+  const b=$('#qBack'); if(b) b.onclick=exitLevel;
+}
+function gotoNext(delay){
+  setTimeout(()=>{
+    Run.i++;
+    if(Run.i>=Run.qs.length) return finishLevel();
+    renderQ();
+  }, delay==null ? 620 : delay);
+}
+/* 答完一题的统一收尾：先给"对"的视觉反馈（立刻），再播报，播完停 1 秒才翻页 */
+function finishAnswer(sayText, rate){
+  if(!sayText){ gotoNext(620); return; }
+  speakWait(sayText, rate).then(()=>gotoNext(1000));
+}
+
+/* =========================================================
+   答错不再直接冲走：给 3 次机会，第 3 次才公布答案，
+   然后停下来等用户自己点「下一题」——留足时间消化。
+   ========================================================= */
+function onWrongAnswer(q, sayText, revealFn, hintFn){
+  Run.tries = (Run.tries||0) + 1;
+  if(Run.tries < MAX_TRIES){
+    beep('bad');
+    if(hintFn && Run.tries >= 2) hintFn();          // 第 2 次失败给个提示（比如排掉一个错选项）
+    toast(Run.tries === 1 ? '再想想，还有 2 次机会' : '最后一次机会，加油！', 1500);
+    return false;                                    // 留在原地重试
+  }
+  // 第 3 次：公布答案 + 念正确语音 + 出现「下一题」按钮
+  Run.locked = true;
+  scoreMark(false);
+  markWrong(q.entry, q.kind);
+  if(revealFn) revealFn();
+  speakWait(sayText, .75);
+  showNextBar(sayText);
+  toast('没关系，记住它就够了 💪', 1800);
+  return true;
+}
+function showNextBar(sayText){
+  const box = $('#afterBox'); if(!box) return;
+  const last = Run.i >= Run.qs.length-1;
+  box.innerHTML = `<div class="row" style="margin-top:14px">
+      <button class="btn sm ghost" id="btnReplay">🔊 再听一遍</button>
+      <button class="btn primary" id="btnNextQ">${last?'看成绩 🏁':'我记住了，下一题 →'}</button>
+    </div>`;
+  $('#btnReplay').onclick = ()=>{ if(sayText) speakWait(sayText, .75); };
+  $('#btnNextQ').onclick  = ()=>{ gotoNext(0); };
+  try{ box.scrollIntoView({block:'nearest', behavior:'smooth'}); }catch(e){}
+}
+function scoreMark(ok, firstTry){
+  if(ok){
+    Run.right++;
+    if(firstTry !== false) Run.stars++;      // 只有一次就答对才给星
+    if(firstTry !== false){ Run.combo++; if(Run.combo>=3) combo(Run.combo); }
+    beep('ok'); fxStars(Store.grade>=5?2:3);
+  } else { Run.combo=0; beep('bad'); }
+}
+
+/* ---------- 1. 看中文选英文 ---------- */
+function vChoose(q){
+  $('#wrap').innerHTML = `<div class="screen">${playHeader()}
+    <div class="qcard" id="qc">
+      <div class="q-zh">${esc(q.zh)}</div>
+      <div class="q-hint">选出对应的英文</div>
+    </div>
+    <div class="opts" id="opts">
+      ${q.options.map((o,i)=>`<button class="opt" data-o="${esc(o)}">${esc(o)}</button>`).join('')}
+    </div>
+    <div id="afterBox"></div>
+  </div>`;
+  bindBack();
+  $$('#opts .opt').forEach(b=>b.onclick=()=>{
+    if(Run.locked) return;
+    const ok = norm(b.dataset.o)===norm(q.answer);
+    if(!ok){
+      // 只标红、不禁用：错选项不能"用完"，否则第 3 次答错就永远触发不了
+      b.classList.add('bad');
+      onWrongAnswer(q, q.answer, ()=>{
+        $$('#opts .opt').forEach(x=>{ if(norm(x.dataset.o)===norm(q.answer)) x.classList.add('good'); });
+      });
+      return;
+    }
+    Run.locked=true;
+    b.classList.add('good');
+    scoreMark(true, Run.tries===0);
+    gotoNext();
+  });
+}
+
+/* ---------- 2. 字母拼图 ---------- */
+function vSpell(q){
+  const ans = q.answer;
+  /* 多词答案（want to do sth / look after …）中间必须有空格：
+     把答案拆成「字母位 + 空格位」的模式，空格位直接显示出来，
+     孩子一眼能看出这题是几个单词、每个词几个字母。 */
+  const words = ans.split(/\s+/).map(w=>w.replace(/[^A-Za-z'’]/g,'')).filter(Boolean);
+  const list  = words.length ? words : [ans.replace(/[^A-Za-z'’]/g,'')];
+  const pattern = [];                       // {t:'L',ch} | {t:'S'}
+  list.forEach((w, wi)=>{
+    if(wi>0) pattern.push({t:'S'});
+    w.split('').forEach(ch=>pattern.push({t:'L', ch}));
+  });
+  const letters = pattern.filter(p=>p.t==='L').map(p=>p.ch);   // 只含字母，用于比对
+  const wordCount = list.length;
+
+  let pool = shuffle(letters.map((c,i)=>({c, id:i})));
+  // 若重复度太高（如 "aa"），补两个干扰字母
+  if(uniq(letters.map(l=>l.toLowerCase())).length<=2 && letters.length<=4){
+    const extra = shuffle('etaosrin'.split('')).slice(0,2);
+    extra.forEach((c,i)=>pool.push({c, id:1000+i}));
+    pool = shuffle(pool);
+  }
+
+  $('#wrap').innerHTML = `<div class="screen">${playHeader()}
+    <div class="qcard">
+      <div class="q-zh">${esc(q.zh)}</div>
+      <div class="q-hint">${wordCount>1
+        ? `<b style="color:#B45309">${wordCount} 个单词</b> · 共 ${letters.length} 个字母 · 单词之间要空格`
+        : `${letters.length} 个字母`}</div>
+    </div>
+    <div class="slots" id="slots"></div>
+    <div class="tiles" id="tiles">
+      ${pool.map(t=>`<button class="tile" data-id="${t.id}" data-c="${esc(t.c)}">${esc(t.c.toLowerCase())}</button>`).join('')}
+    </div>
+    <div class="row" style="margin-top:16px">
+      <button class="btn sm ghost" id="btnUndo">⌫ 退一格</button>
+      <button class="btn sm ghost" id="btnClear">🧹 全清</button>
+    </div>
+    <div class="row" style="margin-top:10px">
+      <button class="btn sm" id="btnHint">💡 提示首字母</button>
+      <button class="btn sm primary" id="btnCheck">✅ 检查</button>
+    </div>
+    <div id="afterBox"></div>
+  </div>`;
+  bindBack();
+  let built = [];
+  const slots=$('#slots');
+  function draw(){
+    let li=0;
+    slots.innerHTML = pattern.map(p=>{
+      if(p.t==='S') return '<div class="slot sp" title="空格">␣</div>';
+      const b = built[li++];
+      return `<div class="slot ${b?'filled':''}">${b?esc(b.c.toLowerCase()):''}</div>`;
+    }).join('');
+    $$('#tiles .tile').forEach(t=>t.classList.toggle('used', built.some(b=>String(b.id)===t.dataset.id)));
+  }
+  draw();
+  $$('#tiles .tile').forEach(t=>t.onclick=()=>{
+    if(Run.locked) return;
+    if(built.length>=letters.length) return;
+    built.push({id:t.dataset.id, c:t.dataset.c}); draw(); beep('tap');
+    if(built.length===letters.length) check(true);
+  });
+  $('#btnUndo').onclick = ()=>{ if(Run.locked)return; built.pop(); draw(); };
+  $('#btnClear').onclick= ()=>{ if(Run.locked)return; built=[]; draw(); };
+  $('#btnHint').onclick = ()=>{
+    if(Run.locked) return;
+    built=[]; built.push({id:'-1', c:letters[0]}); draw(); beep('tap');
+  };
+  $('#btnCheck').onclick = ()=>check(false);
+
+  function check(auto){
+    if(Run.locked) return;
+    if(built.length<letters.length){ toast('还没拼完哦'); return; }
+    const val = built.map(b=>b.c).join('').toLowerCase();
+    const ok = val === letters.join('').toLowerCase();
+    if(!ok){
+      const host=$('#slots'); host.classList.add('shake');
+      setTimeout(()=>host.classList.remove('shake'),420);
+      const ended = onWrongAnswer(q, q.answer, ()=>{
+        built = letters.map((c,i)=>({id:'R'+i, c})); draw();   // 把正确拼写摆出来
+      });
+      if(!ended && auto && built.length){ built.pop(); draw(); }  // 自动填满但拼错：退一格给机会改
+      return;
+    }
+    Run.locked=true;
+    scoreMark(true, Run.tries===0);
+    gotoNext();
+  }
+}
+
+/* ---------- 3. 听音选词 ---------- */
+function vListen(q){
+  $('#wrap').innerHTML = `<div class="screen">${playHeader()}
+    <div class="qcard">
+      <div style="font-size:52px;line-height:1">🔊</div>
+      <button class="btn primary" id="btnPlay" style="margin-top:14px;max-width:260px;margin-left:auto;margin-right:auto">▶︎ 再听一次</button>
+      <div class="q-hint">听发音，选出正确的单词</div>
+    </div>
+    <div class="opts" id="opts">
+      ${q.options.map(o=>`<button class="opt" data-o="${esc(o)}">${esc(o)}</button>`).join('')}
+    </div>
+    <div id="afterBox"></div>
+  </div>`;
+  bindBack();
+  $('#btnPlay').onclick = ()=>speakWait(q.answer, .78);
+  speakWait(q.answer, .78);
+  $$('#opts .opt').forEach(b=>b.onclick=()=>{
+    if(Run.locked) return;
+    const ok = norm(b.dataset.o)===norm(q.answer);
+    if(!ok){
+      b.classList.add('bad');
+      onWrongAnswer(q, q.answer, ()=>{
+        $$('#opts .opt').forEach(x=>{ if(norm(x.dataset.o)===norm(q.answer)) x.classList.add('good'); });
+      });
+      return;
+    }
+    Run.locked=true;
+    b.classList.add('good');
+    scoreMark(true, Run.tries===0);
+    finishAnswer(q.answer, .75);
+  });
+}
+
+/* ---------- 4. 句子填空 ---------- */
+function vCloze(q){
+  const k = q.answer;
+  const re = new RegExp('\\b'+k.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'\\b','ig');
+  const shown = esc(q.full).replace(re,'<span class="blank" id="bk">?</span>');
+  $('#wrap').innerHTML = `<div class="screen">${playHeader()}
+    <div class="qcard">
+      <div class="q-en-sent">${shown}</div>
+      <div class="q-hint">${q.zh?esc(q.zh)+'<br>':''}选出空白处的词</div>
+    </div>
+    <div class="opts" id="opts">
+      ${q.options.map(o=>`<button class="opt wide" data-o="${esc(o)}">${esc(o)}</button>`).join('')}
+    </div>
+    <div id="afterBox"></div>
+  </div>`;
+  bindBack();
+  $$('#opts .opt').forEach(b=>b.onclick=()=>{
+    if(Run.locked) return;
+    const ok = norm(b.dataset.o)===norm(k);
+    if(!ok){
+      b.classList.add('bad');
+      onWrongAnswer(q, q.full, ()=>{
+        const bk=$('#bk'); if(bk) bk.textContent = k;
+        $$('#opts .opt').forEach(x=>{ if(norm(x.dataset.o)===norm(k)) x.classList.add('good'); });
+      });
+      return;
+    }
+    Run.locked=true;
+    b.classList.add('good');
+    const bk=$('#bk'); if(bk) bk.textContent = k;
+    scoreMark(true, Run.tries===0);
+    finishAnswer(q.full, .8);
+  });
+}
+
+/* ---------- 5. 句子排序 ---------- */
+function vOrder(q){
+  let chosen=[], pool=q.tokens.slice();
+  $('#wrap').innerHTML = `<div class="screen">${playHeader()}
+    <div class="qcard">
+      ${q.zh?`<div class="q-zh small">${esc(q.zh)}</div><div class="q-hint">把下面的词排成正确的句子</div>`
+            :`<div class="q-hint">把下面的词排成正确的句子</div>`}
+    </div>
+    <div class="ans-line" id="ansLine"></div>
+    <div class="tokens" id="pool"></div>
+    <div class="row" style="margin-top:14px">
+      <button class="btn sm ghost" id="btnUndo2">⌫ 退一个</button>
+      <button class="btn sm primary" id="btnCheck2">✅ 检查</button>
+    </div>
+    <div id="afterBox"></div>
+  </div>`;
+  bindBack();
+  function draw(){
+    $('#ansLine').innerHTML = chosen.map((w,i)=>`<button class="wt" data-i="${i}">${esc(w)}</button>`).join('') || '<span style="color:#94A3B8;font-size:14px;align-self:center">点下面的词，按顺序排好…</span>';
+    $('#pool').innerHTML = pool.map((w,i)=>`<button class="wt ${w._used?'used':''}" data-i="${i}">${esc(w.t)}</button>`).join('');
+    $$('#ansLine .wt').forEach(b=>b.onclick=()=>{ if(Run.locked)return; const i=+b.dataset.i;
+      const item=chosen.splice(i,1)[0]; const p=pool.find(x=>x.id===item.id); if(p) p._used=false; draw(); });
+    $$('#pool .wt').forEach(b=>b.onclick=()=>{ if(Run.locked)return; const it=pool[+b.dataset.i];
+      if(it._used)return; it._used=true; chosen.push({t:it.t,id:it.id}); draw(); beep('tap'); });
+  }
+  pool = q.tokens.map((t,i)=>({t, id:i, _used:false}));
+  draw();
+  $('#btnUndo2').onclick=()=>{ if(Run.locked)return; const c=chosen.pop(); if(c){const p=pool.find(x=>x.id===c.id); if(p)p._used=false;} draw(); };
+  $('#btnCheck2').onclick=()=>{
+    if(Run.locked) return;
+    if(chosen.length<q.words.length){ toast('还没排完哦'); return; }
+    const val = chosen.map(x=>x.t).join(' ');
+    const ok = norm(val)===norm(q.words.join(' '));
+    if(!ok){
+      $('#ansLine').classList.add('shake'); setTimeout(()=>$('#ansLine').classList.remove('shake'),420);
+      const ended = onWrongAnswer(q, q.answer, ()=>{
+        $('#ansLine').innerHTML = q.words.map(w=>`<button class="wt">${esc(w)}</button>`).join('');  // 摆出正确顺序
+      });
+      if(!ended){                                  // 还没到第 3 次：把词放回词池让他重排
+        chosen.forEach(c=>{ const p=pool.find(x=>x.id===c.id); if(p) p._used=false; });
+        chosen=[]; draw();
+      }
+      return;
+    }
+    Run.locked=true;
+    scoreMark(true, Run.tries===0);
+    finishAnswer(q.answer, .8);
+  };
+}
+
+/* ---------- 6. 默写挑战 ---------- */
+function vWrite(q){
+  const isSent = q.type==='sent';
+  const first = Store.grade<5 && !isSent && q.answer ? q.answer[0] : '';
+  $('#wrap').innerHTML = `<div class="screen">${playHeader(`
+    <div class="chips center" style="justify-content:center;margin-bottom:10px">
+      <button class="chip ${S.writeMode==='hand'?'on':''}" data-m="hand">✍️ 手写</button>
+      <button class="chip ${S.writeMode==='type'?'on':''}" data-m="type">⌨️ 打字</button>
+    </div>`)}
+    <div class="qcard" style="padding:16px">
+      <div class="q-zh ${isSent?'small':''}">${esc(q.zh)}</div>
+      <div class="q-hint">${isSent?'写出完整的英文句子':'写出英文单词'}${first?` &nbsp;（首字母 ${first}）`:''}</div>
+    </div>
+    <div class="writebox">
+      ${S.writeMode==='hand'
+        ? `<canvas class="hand ${isSent?'tall':''}" id="cv"></canvas>
+           <div class="hint4">用手指或 Apple Pencil 在上面写</div>`
+        : `<input class="type" id="ti" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="在这里输入英文…">`}
+    </div>
+    <div id="ansBox"></div>
+    <div class="row" style="margin-top:14px">
+      ${S.writeMode==='hand'
+        ? `<button class="btn sm ghost" id="btnErase">🧹 擦掉重写</button>
+           <button class="btn sm primary" id="btnShow">👀 看答案</button>`
+        : `<button class="btn sm primary" id="btnSubmit">✅ 检查</button>`}
+    </div>
+    <div class="row" id="selfRow" style="margin-top:10px"></div>
+    <div id="afterBox"></div>
+  </div>`;
+  bindBack();
+  $$('.chips .chip').forEach(c=>c.onclick=()=>{ if(Run.locked) return; S.writeMode=c.dataset.m; vWrite(q); });
+
+  /* 手写模式的「写错了」也是自评 → 公布答案后停下来等他点下一题 */
+  const finishWrongHand = ()=>{
+    Run.locked=true;
+    scoreMark(false);
+    markWrong(q.entry, 'write');
+    $('#ansBox').innerHTML = `<div class="answer bad">❌ 正确答案：${esc(q.answer)}</div>`;
+    speakWait(q.answer, .75);
+    showNextBar(q.answer);
+  };
+
+  if(S.writeMode==='hand'){
+    const cv=$('#cv');
+    setupCanvas(cv);
+    $('#btnErase').onclick = ()=>{ clearCanvas(cv); };
+    $('#btnShow').onclick = ()=>{
+      if(Run.locked) return;
+      Run.locked = true;
+      $('#ansBox').innerHTML = `<div class="answer">✅ 正确答案：${esc(q.answer)}</div>
+        <div class="center" style="margin-top:10px"><button class="btn sm ghost" id="btnSay">🔊 听一遍</button></div>`;
+      $('#btnSay').onclick = ()=>speakWait(q.answer,.75);
+      speakWait(q.answer,.75);
+      $('#selfRow').innerHTML = `
+        <button class="btn green" id="saidOk">😃 我写对了</button>
+        <button class="btn" id="saidNo" style="border-color:#FCA5A5;color:#B91C1C">😅 写错了</button>`;
+      $('#saidOk').onclick = ()=>{ Run.locked=false; Run.locked=true; scoreMark(true, Run.tries===0); finishAnswer(q.answer, .75); };
+      $('#saidNo').onclick = ()=>{ Run.locked=false; finishWrongHand(); };
+    };
+  }else{
+    const ti=$('#ti');
+    setTimeout(()=>ti.focus(),200);
+    const submit = ()=>{
+      if(Run.locked) return;
+      const ok = norm(ti.value)===norm(q.answer) || (isSent && norm(ti.value).replace(/[.]$/,'')===norm(q.answer).replace(/[.]$/,''));
+      if(!ok){
+        ti.style.borderColor = '#EF4444';
+        const ended = onWrongAnswer(q, q.answer, ()=>{
+          $('#ansBox').innerHTML = `<div class="answer bad">❌ 正确答案：${esc(q.answer)}</div>`;
+        });
+        if(!ended){ setTimeout(()=>{ ti.focus(); ti.select(); }, 60); }
+        return;
+      }
+      Run.locked=true;
+      ti.style.borderColor = '#16A34A';
+      $('#ansBox').innerHTML = '<div class="answer">✅ 完全正确！</div>';
+      scoreMark(true, Run.tries===0);
+      finishAnswer(q.answer, .75);
+    };
+    $('#btnSubmit').onclick = submit;
+    ti.onkeydown = e=>{ if(e.key==='Enter') submit(); };
+  }
+}
+function markWrong(entry, kind){
+  if(!entry || !entry.en) return;
+  const k = norm(entry.en);
+  const ex = Store.wrong.find(x=>norm(x.en)===k);
+  if(ex){ ex.n=(ex.n||1)+1; ex.ts=Date.now(); ex.zh=entry.zh||ex.zh; }
+  else Store.wrong.unshift({en:entry.en, zh:entry.zh||'', kind:kind==='write'?'write':(entry.kind||'word'), n:1, ts:Date.now()});
+  Store.wrong = Store.wrong.slice(0,300);
+  save(K.wrong, Store.wrong);
+  S.lastWrong.push(entry.en);
+}
+
+/* ---------- 画布 ---------- */
+function setupCanvas(cv){
+  const ctx = cv.getContext('2d');
+  const dpr = Math.min(window.devicePixelRatio||1, 2);
+  const rect = cv.getBoundingClientRect();
+  const w = rect.width||320, h = rect.height||190;
+  cv.width = w*dpr; cv.height = h*dpr;
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  ctx.fillStyle='#fff'; ctx.fillRect(0,0,w,h);
+  // 四线三格参考线
+  ctx.strokeStyle='#E2E8F0'; ctx.lineWidth=1; ctx.setLineDash([5,5]);
+  [0.28,0.46,0.70,0.88].forEach(p=>{ ctx.beginPath(); ctx.moveTo(14,h*p); ctx.lineTo(w-14,h*p); ctx.stroke(); });
+  ctx.setLineDash([]);
+  ctx.strokeStyle='#CBD5E1'; ctx.lineWidth=1.4;
+  ctx.beginPath(); ctx.moveTo(14,h*0.5); ctx.lineTo(w-14,h*0.5); ctx.stroke();
+  ctx.lineWidth=3.2; ctx.lineCap='round'; ctx.lineJoin='round'; ctx.strokeStyle='#1E3A8A';
+  let drawing=false, last=null;
+  const pos = e=>{ const r=cv.getBoundingClientRect(); return {x:e.clientX-r.left, y:e.clientY-r.top}; };
+  cv.onpointerdown = e=>{ e.preventDefault(); drawing=true; last=pos(e); try{cv.setPointerCapture(e.pointerId);}catch(_){} };
+  cv.onpointermove = e=>{ if(!drawing) return; e.preventDefault(); const p=pos(e);
+    ctx.beginPath(); ctx.moveTo(last.x,last.y); ctx.lineTo(p.x,p.y); ctx.stroke(); last=p; };
+  cv.onpointerup = cv.onpointercancel = e=>{ drawing=false; last=null; };
+}
+function clearCanvas(cv){
+  const ctx=cv.getContext('2d');
+  const dpr = Math.min(window.devicePixelRatio||1,2);
+  const w=cv.width/dpr, h=cv.height/dpr;
+  ctx.save(); ctx.setTransform(dpr,0,0,dpr,0,0);
+  ctx.fillStyle='#fff'; ctx.fillRect(0,0,w,h);
+  ctx.restore();
+  // 重画参考线
+  ctx.save(); ctx.setTransform(dpr,0,0,dpr,0,0);
+  ctx.strokeStyle='#E2E8F0'; ctx.lineWidth=1; ctx.setLineDash([5,5]);
+  [0.28,0.46,0.70,0.88].forEach(p=>{ ctx.beginPath(); ctx.moveTo(14,h*p); ctx.lineTo(w-14,h*p); ctx.stroke(); });
+  ctx.setLineDash([]);
+  ctx.strokeStyle='#CBD5E1'; ctx.lineWidth=1.4;
+  ctx.beginPath(); ctx.moveTo(14,h*0.5); ctx.lineTo(w-14,h*0.5); ctx.stroke();
+  ctx.lineWidth=3.2; ctx.lineCap='round'; ctx.lineJoin='round'; ctx.strokeStyle='#1E3A8A';
+  ctx.restore();
+}
+
+/* ---------- 结算 ---------- */
+function finishLevel(){
+  const total = Run.qs.length, right = Run.right;
+  const stars = right===total?3 : right/total>=0.8?2 : right/total>=0.5?1 : 0;
+  S.done[Run.id] = stars;
+  // 记录战绩
+  const d = today();
+  const rec = Store.stats[d] || {stars:0,right:0,total:0,levels:0};
+  rec.stars += Run.stars; rec.right += right; rec.total += total; rec.levels += 1;
+  Store.stats[d] = rec; save(K.stats, Store.stats);
+  save(KS.run, null);                 // 这一关做完了，不再需要断点
+  saveSession();
+  beep('done'); fxStars(stars>=2?6:3);
+  go('result');
+}
+
+/* =========================================================
+   结算页
+   ========================================================= */
+function renderResult(){
+  const total = Run.qs.length, right = Run.right;
+  const rate = Math.round(right/total*100);
+  const stars = S.done[Run.id]||0;
+  const lv = LEVELS.find(l=>l.id===Run.id)||{};
+  const all = activeLevels();
+  const idx = all.findIndex(l=>l.id===Run.id);
+  const next = all[idx+1];
+  const msg = rate===100?'完美通关！一个都没错 🎉' : rate>=80?'很棒！只有一点点小错 👍' : rate>=50?'不错，错的再练一次就熟了 💪' : '没关系，多练两遍就记住了 🌱';
+  $('#wrap').innerHTML = `<div class="screen">
+    <div class="card center">
+      <div style="font-size:46px;line-height:1">${rate===100?'🏅':rate>=80?'🎉':'🌱'}</div>
+      <h1 style="margin-top:8px">${lv.nm||''} · 完成</h1>
+      <div style="font-size:30px;letter-spacing:6px;margin:8px 0">${'⭐'.repeat(stars)}${'☆'.repeat(3-stars)}</div>
+      <div class="big-num" style="font-size:40px">${rate}<span style="font-size:22px">%</span></div>
+      <p class="sub" style="margin-top:8px">答对 <b>${right}</b> / ${total} 题 &nbsp;·&nbsp; 其中<b>一次就答对</b> <b>${Run.stars}</b> 题 ⭐</p>
+      <p class="sub">${msg}</p>
+    </div>
+    ${S.lastWrong.length?`<div class="card">
+      <h2>📕 这次写错的</h2>
+      <div>${uniq(S.lastWrong).map(e=>`<div class="wrow"><div class="en">${esc(e)}</div></div>`).join('')}</div>
+      <p class="sub" style="margin-top:8px">已经自动记进错词本，可以专门练它们。</p>
+    </div>`:''}
+    <div class="row" style="margin-bottom:10px">
+      <button class="btn ghost" id="btnAgain">🔁 再玩一次</button>
+      ${next?`<button class="btn primary" id="btnNext">下一关：${next.nm} →</button>`
+            :`<button class="btn green" id="btnAll">🎊 回到关卡列表</button>`}
+    </div>
+    <button class="btn amber" id="btnPracWrong">📕 只练错词（${Store.wrong.length}）</button>
+  </div>`;
+  $('#btnAgain').onclick = ()=>{ S.lastWrong=[]; startLevel(Run.id); };
+  if($('#btnNext')) $('#btnNext').onclick = ()=>{ S.lastWrong=[]; startLevel(next.id); };
+  if($('#btnAll'))  $('#btnAll').onclick  = ()=>{ S.lastWrong=[]; go('levels'); };
+  $('#btnPracWrong').onclick = ()=>{ S.lastWrong=[]; practiceWrong(); };
+}
+function practiceWrong(){
+  const ws = Store.wrong.slice(0,30).filter(x=>x.en);
+  if(!ws.length){ toast('错词本是空的，真棒！'); return; }
+  const oldW=S.words, oldS=S.sents;
+  const isSent = x => x.kind==='sent' || /[A-Za-z]\s+[A-Za-z]/.test(x.en);
+  S.words = ws.filter(x=>!isSent(x)).map(x=>({en:x.en, zh:x.zh||'', kind:'word', on:true}));
+  S.sents = ws.filter(isSent).map(x=>({en:x.en, zh:x.zh||'', kind:'sent', on:true, key:pickKey(x.en)})).filter(x=>x.key);
+  const qs = buildQuestions('write');
+  S.words=oldW; S.sents=oldS;
+  if(!qs.length){ toast('错词本内容还不够出题'); return; }
+  S.lastWrong=[];
+  startLevel('write', qs);
+  toast('这一关只练错词，加油！');
+}
+
+/* =========================================================
+   错词本
+   ========================================================= */
+function renderWrong(){
+  const ws = Store.wrong.slice().sort((a,b)=> (b.n||1)-(a.n||1) || (b.ts||0)-(a.ts||0));
+  $('#wrap').innerHTML = `<div class="screen">
+    <div class="card">
+      <h2>📕 错词本（${ws.length}）</h2>
+      <p class="sub">答错过的词会自动进来，错得越多排得越前。练熟了就删掉。</p>
+      ${ws.length? `<button class="btn amber" id="btnP1">🎯 只练错词</button>` : ''}
+    </div>
+    ${ws.length? `<div class="card">${ws.map((x,i)=>`
+      <div class="wrow">
+        <div class="en">${esc(x.en)}</div>
+        <div class="zh">${esc(x.zh||'')}</div>
+        <div class="n">×${x.n||1}</div>
+        <button class="del" data-en="${esc(x.en)}" style="width:34px;height:34px;border-radius:11px;background:#fff;border:1.5px solid #E5E7EB;color:#EF4444">✕</button>
+      </div>`).join('')}
+      <button class="btn sm ghost" id="btnClearW" style="margin-top:10px">清空错词本</button>
+    </div>` : `<div class="card center"><div style="font-size:44px">🎉</div><p class="sub">还没有错词，真厉害！</p></div>`}
+  </div>`;
+  if($('#btnP1')) $('#btnP1').onclick = practiceWrong;
+  $$('.wrow .del').forEach(b=>b.onclick=()=>{
+    Store.wrong = Store.wrong.filter(x=>x.en !== b.dataset.en);
+    save(K.wrong, Store.wrong); renderWrong();
+  });
+  if($('#btnClearW')) $('#btnClearW').onclick = ()=>{
+    if(!confirm('确定清空错词本吗？')) return;
+    Store.wrong=[]; save(K.wrong,[]); renderWrong();
+  };
+}
+
+/* =========================================================
+   成绩
+   ========================================================= */
+function renderStats(){
+  const days = Object.keys(Store.stats).sort().reverse().slice(0,14);
+  const totalStars = Object.values(Store.stats).reduce((a,b)=>a+(b.stars||0),0);
+  const totalRight = Object.values(Store.stats).reduce((a,b)=>a+(b.right||0),0);
+  const totalAll   = Object.values(Store.stats).reduce((a,b)=>a+(b.total||0),0);
+  const rate = totalAll? Math.round(totalRight/totalAll*100):0;
+  $('#wrap').innerHTML = `<div class="screen">
+    <div class="card center">
+      <h2>总成绩</h2>
+      <div class="big-num">${totalStars}</div>
+      <p class="sub">累计星星 &nbsp;·&nbsp; 总正确率 <b>${rate}%</b>（${totalRight}/${totalAll}）</p>
+    </div>
+    <div class="card">
+      <h2>每天记录</h2>
+      ${days.length? `<table class="st">
+        <tr><th>日期</th><th>⭐</th><th>正确</th><th>题量</th><th>正确率</th></tr>
+        ${days.map(d=>{const r=Store.stats[d];const p=r.total?Math.round(r.right/r.total*100):0;
+          return `<tr><td class="d">${d.slice(5)}</td><td>${r.stars||0}</td><td>${r.right||0}</td><td>${r.total||0}</td><td><b>${p}%</b></td></tr>`;}).join('')}
+      </table>` : `<p class="sub">还没有记录，玩一关就有了。</p>`}
+    </div>
+  </div>`;
+}
+
+/* =========================================================
+   顶栏
+   ========================================================= */
+$('#btnBack').onclick = goBack;
+$('#btnHome').onclick = ()=>{
+  if(route==='play'){ exitLevel(); return; }     // 中途回首页：先问，且进度保留
+  go('home');
+};
+$('#btnWrong').onclick = ()=>go('wrong');
+$('#btnStats').onclick = ()=>go('stats');
+$('#btnSound').onclick = ()=>{
+  Store.sound = !Store.sound; save(K.sound, Store.sound);
+  $('#btnSound').textContent = Store.sound?'🔊':'🔇';
+  $('#btnSound').classList.toggle('off', !Store.sound);
+  toast(Store.sound?'声音已打开':'声音已关闭', 1000);
+};
+$('#btnSound').textContent = Store.sound?'🔊':'🔇';
+$('#btnSound').classList.toggle('off', !Store.sound);
+
+/* 首次触摸激活音频上下文 + 解锁 iOS 的语音（iOS 要求语音必须由用户手势"开封"过，
+   否则后面自动播放会被静默丢弃或排队错乱） */
+window.addEventListener('pointerdown', function once(){
+  try{ AC = AC || new (window.AudioContext||window.webkitAudioContext)(); if(AC.state==='suspended') AC.resume(); }catch(e){}
+  try{
+    if(!window.__ttsUnlocked && 'speechSynthesis' in window){
+      window.__ttsUnlocked = true;
+      const u = new SpeechSynthesisUtterance(' ');
+      u.lang = 'en-US'; u.volume = 0;
+      speechSynthesis.speak(u);
+    }
+  }catch(e){}
+  window.removeEventListener('pointerdown', once);
+});
+
+/* 启动：先恢复上次的内容和没做完的那一关 */
+applyHashConfig();                    // 支持一次性配置链接 …/#k=你的key
+restoreSession();
+if(restoreRun()){ go('levels'); } else { go('home'); }
+</script>
+</body>
+</html>
