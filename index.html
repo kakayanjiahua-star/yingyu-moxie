@@ -236,12 +236,23 @@ textarea#rawText:focus{outline:none;border-color:var(--blue);}
 
 /* write / canvas */
 .writebox{margin-top:6px;}
-canvas.hand{
-  width:100%;height:190px;border-radius:16px;background:#fff;
-  border:2.5px solid var(--line);touch-action:none;display:block;
+/* 写字区：参考线放在画布"后面"的独立层里，这样橡皮只擦掉笔迹、不会把格线也擦没 */
+.handwrap{
+  position:relative;border:2.5px solid var(--line);border-radius:16px;
+  background:#fff;overflow:hidden;
 }
-canvas.hand.tall{height:250px;}
+.handwrap .guides{position:absolute;inset:0;pointer-events:none;z-index:0}
+.handwrap .guides i{position:absolute;left:10px;right:10px;height:0;border-top:1.5px dashed #E2E8F0}
+.handwrap .guides i.baseline{border-top-style:solid;border-top-color:#CBD5E1}
+canvas.hand{
+  position:relative;z-index:1;display:block;width:100%;height:100%;
+  background:transparent;touch-action:none;
+}
+.handwrap{height:clamp(240px,35vh,340px);}
+.handwrap.tall{height:clamp(310px,46vh,440px);}
 .hint4{font-size:12px;color:var(--ink2);text-align:center;margin-top:6px;}
+.htools{display:flex;gap:8px;margin-top:10px;}
+.htools .chip{flex:1;text-align:center;justify-content:center;min-height:46px;display:flex;align-items:center;}
 input.type{
   width:100%;min-height:58px;border-radius:14px;border:2.5px solid var(--line);
   font-size:22px;font-weight:800;padding:12px 14px;text-align:center;letter-spacing:1px;
@@ -1670,8 +1681,8 @@ function vChoose(q){
     if(Run.locked) return;
     const ok = norm(b.dataset.o)===norm(q.answer);
     if(!ok){
-      // 只标红、不禁用：错选项不能"用完"，否则第 3 次答错就永远触发不了
-      b.classList.add('bad');
+      // 防作弊：选错的那个直接禁用（不能对同一个选项反复乱点凑次数）
+      b.classList.add('bad'); b.disabled = true;
       onWrongAnswer(q, q.answer, ()=>{
         $$('#opts .opt').forEach(x=>{ if(norm(x.dataset.o)===norm(q.answer)) x.classList.add('good'); });
       });
@@ -1796,7 +1807,7 @@ function vListen(q){
     if(Run.locked) return;
     const ok = norm(b.dataset.o)===norm(q.answer);
     if(!ok){
-      b.classList.add('bad');
+      b.classList.add('bad'); b.disabled = true;
       onWrongAnswer(q, q.answer, ()=>{
         $$('#opts .opt').forEach(x=>{ if(norm(x.dataset.o)===norm(q.answer)) x.classList.add('good'); });
       });
@@ -1829,7 +1840,7 @@ function vCloze(q){
     if(Run.locked) return;
     const ok = norm(b.dataset.o)===norm(k);
     if(!ok){
-      b.classList.add('bad');
+      b.classList.add('bad'); b.disabled = true;
       onWrongAnswer(q, q.full, ()=>{
         const bk=$('#bk'); if(bk) bk.textContent = k;
         $$('#opts .opt').forEach(x=>{ if(norm(x.dataset.o)===norm(k)) x.classList.add('good'); });
@@ -1909,17 +1920,26 @@ function vWrite(q){
     </div>
     <div class="writebox">
       ${S.writeMode==='hand'
-        ? `<canvas class="hand ${isSent?'tall':''}" id="cv"></canvas>
-           <div class="hint4">用手指或 Apple Pencil 在上面写</div>`
+        ? `<div class="handwrap ${isSent?'tall':''}">
+             ${handGuidesHTML(isSent)}
+             <canvas class="hand" id="cv"></canvas>
+           </div>
+           <div class="htools">
+             <button class="chip on" id="toolPen">✏️ 笔</button>
+             <button class="chip" id="toolEraser">🧽 橡皮</button>
+           </div>
+           <div class="hint4">橡皮擦哪儿是哪儿；写错了也能一笔一笔撤</div>`
         : `<input class="type" id="ti" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="在这里输入英文…">`}
     </div>
     <div id="ansBox"></div>
     <div class="row" style="margin-top:14px">
       ${S.writeMode==='hand'
-        ? `<button class="btn sm ghost" id="btnErase">🧹 擦掉重写</button>
-           <button class="btn sm primary" id="btnShow">👀 看答案</button>`
+        ? `<button class="btn sm ghost" id="btnUndo1">↩️ 撤销一笔</button>
+           <button class="btn sm ghost" id="btnErase">🧹 全清</button>`
         : `<button class="btn sm primary" id="btnSubmit">✅ 检查</button>`}
     </div>
+    ${S.writeMode==='hand'
+      ? `<button class="btn primary" id="btnShow" style="margin-top:10px">✅ 我写好了，对答案</button>` : ''}
     <div class="row" id="selfRow" style="margin-top:10px"></div>
     <div id="afterBox"></div>
   </div>`;
@@ -1939,9 +1959,26 @@ function vWrite(q){
   if(S.writeMode==='hand'){
     const cv=$('#cv');
     setupCanvas(cv);
-    $('#btnErase').onclick = ()=>{ clearCanvas(cv); };
+    const letters = q.answer.replace(/[^A-Za-z]/g,'').length;
+    const setTool = t=>{
+      cv._tool = t;
+      $('#toolPen').classList.toggle('on', t==='pen');
+      $('#toolEraser').classList.toggle('on', t==='eraser');
+    };
+    $('#toolPen').onclick    = ()=>{ if(Run.locked) return; setTool('pen'); };
+    $('#toolEraser').onclick = ()=>{ if(Run.locked) return; setTool('eraser'); };
+    $('#btnUndo1').onclick   = ()=>{ if(Run.locked) return; if(!cv._undo()) toast('还没有可以撤的笔画'); };
+    $('#btnErase').onclick   = ()=>{ if(Run.locked) return; cv._clear(); };
     $('#btnShow').onclick = ()=>{
       if(Run.locked) return;
+      /* 防作弊：没真写过不许自评"写对了" —— 否则空着点一下就能拿星 */
+      const need = cv._inkNeeded(letters);
+      if(cv._ink < need){
+        beep('bad');
+        toast('先在格子里把'.concat(isSent?'句子':'单词','写出来吧 ✍️'), 1700);
+        try{ cv.classList.add('shake'); setTimeout(()=>cv.classList.remove('shake'), 420); }catch(e){}
+        return;
+      }
       Run.locked = true;
       $('#ansBox').innerHTML = `<div class="answer">✅ 正确答案：${esc(q.answer)}</div>
         <div class="center" style="margin-top:10px"><button class="btn sm ghost" id="btnSay">🔊 听一遍</button></div>`;
@@ -1950,7 +1987,7 @@ function vWrite(q){
       $('#selfRow').innerHTML = `
         <button class="btn green" id="saidOk">😃 我写对了</button>
         <button class="btn" id="saidNo" style="border-color:#FCA5A5;color:#B91C1C">😅 写错了</button>`;
-      $('#saidOk').onclick = ()=>{ Run.locked=false; Run.locked=true; scoreMark(true, Run.tries===0); finishAnswer(q.answer, .75); };
+      $('#saidOk').onclick = ()=>{ Run.locked=true; scoreMark(true, Run.tries===0); finishAnswer(q.answer, .75); };
       $('#saidNo').onclick = ()=>{ Run.locked=false; finishWrongHand(); };
     };
   }else{
@@ -1989,44 +2026,103 @@ function markWrong(entry, kind){
 }
 
 /* ---------- 画布 ---------- */
+/* =========================================================
+   手写画布
+   · 笔 / 橡皮 两种工具，橡皮擦哪儿是哪儿（不是一下全没）
+   · 撤销一笔
+   · 记录"到底写了多少"（防作弊：没写东西不许自评"写对了"）
+   · 格线画在画布后面的独立层，橡皮不会把格线擦掉
+   ========================================================= */
+const PEN = { color:'#1E3A8A', width:3.6 };
+const ERASER_W = 26;
+const GUIDE_POS = [0.24, 0.46, 0.74, 0.90];   // 四线三格（上下都留了余量）
+
+function handGuidesHTML(tall){
+  return `<div class="guides">${GUIDE_POS.map((p,i)=>
+    `<i class="${i===2?'baseline':''}" style="top:${(p*100).toFixed(1)}%"></i>`).join('')}</div>`;
+}
+
 function setupCanvas(cv){
   const ctx = cv.getContext('2d');
   const dpr = Math.min(window.devicePixelRatio||1, 2);
   const rect = cv.getBoundingClientRect();
-  const w = rect.width||320, h = rect.height||190;
-  cv.width = w*dpr; cv.height = h*dpr;
+  const w = Math.max(140, rect.width || 320);
+  const h = Math.max(140, rect.height || 240);
+  cv.width = Math.round(w*dpr); cv.height = Math.round(h*dpr);
   ctx.setTransform(dpr,0,0,dpr,0,0);
-  ctx.fillStyle='#fff'; ctx.fillRect(0,0,w,h);
-  // 四线三格参考线
-  ctx.strokeStyle='#E2E8F0'; ctx.lineWidth=1; ctx.setLineDash([5,5]);
-  [0.28,0.46,0.70,0.88].forEach(p=>{ ctx.beginPath(); ctx.moveTo(14,h*p); ctx.lineTo(w-14,h*p); ctx.stroke(); });
-  ctx.setLineDash([]);
-  ctx.strokeStyle='#CBD5E1'; ctx.lineWidth=1.4;
-  ctx.beginPath(); ctx.moveTo(14,h*0.5); ctx.lineTo(w-14,h*0.5); ctx.stroke();
-  ctx.lineWidth=3.2; ctx.lineCap='round'; ctx.lineJoin='round'; ctx.strokeStyle='#1E3A8A';
-  let drawing=false, last=null;
-  const pos = e=>{ const r=cv.getBoundingClientRect(); return {x:e.clientX-r.left, y:e.clientY-r.top}; };
-  cv.onpointerdown = e=>{ e.preventDefault(); drawing=true; last=pos(e); try{cv.setPointerCapture(e.pointerId);}catch(_){} };
-  cv.onpointermove = e=>{ if(!drawing) return; e.preventDefault(); const p=pos(e);
-    ctx.beginPath(); ctx.moveTo(last.x,last.y); ctx.lineTo(p.x,p.y); ctx.stroke(); last=p; };
-  cv.onpointerup = cv.onpointercancel = e=>{ drawing=false; last=null; };
-}
-function clearCanvas(cv){
-  const ctx=cv.getContext('2d');
-  const dpr = Math.min(window.devicePixelRatio||1,2);
-  const w=cv.width/dpr, h=cv.height/dpr;
-  ctx.save(); ctx.setTransform(dpr,0,0,dpr,0,0);
-  ctx.fillStyle='#fff'; ctx.fillRect(0,0,w,h);
-  ctx.restore();
-  // 重画参考线
-  ctx.save(); ctx.setTransform(dpr,0,0,dpr,0,0);
-  ctx.strokeStyle='#E2E8F0'; ctx.lineWidth=1; ctx.setLineDash([5,5]);
-  [0.28,0.46,0.70,0.88].forEach(p=>{ ctx.beginPath(); ctx.moveTo(14,h*p); ctx.lineTo(w-14,h*p); ctx.stroke(); });
-  ctx.setLineDash([]);
-  ctx.strokeStyle='#CBD5E1'; ctx.lineWidth=1.4;
-  ctx.beginPath(); ctx.moveTo(14,h*0.5); ctx.lineTo(w-14,h*0.5); ctx.stroke();
-  ctx.lineWidth=3.2; ctx.lineCap='round'; ctx.lineJoin='round'; ctx.strokeStyle='#1E3A8A';
-  ctx.restore();
+  ctx.lineCap='round'; ctx.lineJoin='round';
+
+  cv._strokes = [];        // [{tool:'pen'|'eraser', pts:[{x,y}]}]
+  cv._tool = 'pen';
+  cv._ink = 0;             // 累计"笔迹长度"，用来判断是不是真的写了
+
+  const pos = e => { const r=cv.getBoundingClientRect(); return {x:e.clientX-r.left, y:e.clientY-r.top}; };
+  function applyTool(s){
+    if(s.tool==='eraser'){
+      ctx.globalCompositeOperation='destination-out';
+      ctx.lineWidth = ERASER_W; ctx.strokeStyle='rgba(0,0,0,1)'; ctx.fillStyle='rgba(0,0,0,1)';
+    }else{
+      ctx.globalCompositeOperation='source-over';
+      ctx.lineWidth = PEN.width; ctx.strokeStyle = PEN.color; ctx.fillStyle = PEN.color;
+    }
+  }
+  function paintOne(s){
+    if(!s.pts.length) return;
+    ctx.save(); applyTool(s);
+    if(s.pts.length===1){
+      ctx.beginPath(); ctx.arc(s.pts[0].x, s.pts[0].y, ctx.lineWidth/2, 0, Math.PI*2); ctx.fill();
+    }else{
+      ctx.beginPath(); ctx.moveTo(s.pts[0].x, s.pts[0].y);
+      for(let i=1;i<s.pts.length;i++) ctx.lineTo(s.pts[i].x, s.pts[i].y);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+  function repaint(){
+    ctx.save(); ctx.setTransform(dpr,0,0,dpr,0,0);
+    ctx.clearRect(0,0,w,h);
+    cv._strokes.forEach(paintOne);
+    ctx.restore();
+  }
+  function recalcInk(){
+    let n=0;
+    for(const s of cv._strokes){
+      if(s.tool!=='pen') continue;
+      for(let i=1;i<s.pts.length;i++) n += Math.hypot(s.pts[i].x-s.pts[i-1].x, s.pts[i].y-s.pts[i-1].y);
+    }
+    cv._ink = n;
+  }
+
+  let cur=null;
+  cv.onpointerdown = e=>{
+    e.preventDefault();
+    try{ cv.setPointerCapture(e.pointerId); }catch(_){}
+    const p = pos(e);
+    cur = { tool: cv._tool, pts:[p] };
+    cv._strokes.push(cur);
+    paintOne(cur);
+  };
+  cv.onpointermove = e=>{
+    if(!cur) return;
+    e.preventDefault();
+    const p = pos(e);
+    const last = cur.pts[cur.pts.length-1];
+    const d = Math.hypot(p.x-last.x, p.y-last.y);
+    if(d < 1.2) return;
+    cur.pts.push(p);
+    if(cur.tool==='pen') cv._ink += d;
+    ctx.save(); applyTool(cur);
+    ctx.beginPath(); ctx.moveTo(last.x,last.y); ctx.lineTo(p.x,p.y); ctx.stroke();
+    ctx.restore();
+  };
+  const stop = ()=>{ cur=null; };
+  cv.onpointerup = stop; cv.onpointercancel = stop; cv.onlostpointercapture = stop;
+
+  cv._repaint = repaint;
+  cv._undo = ()=>{ if(!cv._strokes.length) return false; cv._strokes.pop(); recalcInk(); repaint(); return true; };
+  cv._clear = ()=>{ cv._strokes=[]; cv._ink=0; repaint(); };
+  cv._inkNeeded = (letters)=> Math.max(90, (letters||4) * 16);   // 至少要画出这么多，才算"写了"
+  return cv;
 }
 
 /* ---------- 结算 ---------- */
@@ -2063,7 +2159,8 @@ function renderResult(){
       <h1 style="margin-top:8px">${lv.nm||''} · 完成</h1>
       <div style="font-size:30px;letter-spacing:6px;margin:8px 0">${'⭐'.repeat(stars)}${'☆'.repeat(3-stars)}</div>
       <div class="big-num" style="font-size:40px">${rate}<span style="font-size:22px">%</span></div>
-      <p class="sub" style="margin-top:8px">答对 <b>${right}</b> / ${total} 题 &nbsp;·&nbsp; 其中<b>一次就答对</b> <b>${Run.stars}</b> 题 ⭐</p>
+      <p class="sub" style="margin-top:8px">答对 <b>${right}</b> / ${total} 题 &nbsp;·&nbsp; 其中<b style="color:#B45309">一次就答对</b> <b>${Run.stars}</b> 题 ⭐</p>
+      <p class="sub" style="font-size:13px">（只有一次就答对才给⭐；靠反复试出来的不算真会）</p>
       <p class="sub">${msg}</p>
     </div>
     ${S.lastWrong.length?`<div class="card">
