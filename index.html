@@ -796,6 +796,36 @@ const sentLike = e => {
   return (toks.length>=4 && /[.!?]\s*$/.test(String(e).trim())) || toks.length>=6;
 };
 
+/* 模型有时候把一整段塞进一条 sentence（中文也是），
+   句子排序就会一次甩出十几个词，根本排不动。
+   这里按句末标点切开。不用 lookbehind，兼容旧 Safari。 */
+function splitMultiSentences(en, zh){
+  const one = { en: String(en||'').trim(), zh: String(zh||'').trim() };
+  const parts = [];
+  let cur = '';
+  const s = one.en;
+  for(let i=0;i<s.length;i++){
+    cur += s[i];
+    if(/[.!?]/.test(s[i])){
+      const rest = s.slice(i+1);
+      if(rest.trim()==='' || /^\s+["'A-Z]/.test(rest)){ parts.push(cur.trim()); cur=''; }
+    }
+  }
+  if(cur.trim()) parts.push(cur.trim());
+  const good = parts.filter(p => p.split(/\s+/).filter(Boolean).length >= 3);
+  if(good.length < 2) return [one];
+
+  // 中文也按句号切；两边句数对得上才配对，对不上就整段给第一句
+  const zparts = [];
+  let zc = '';
+  for(const ch of one.zh){
+    zc += ch;
+    if('。！？'.indexOf(ch) >= 0){ zparts.push(zc.trim()); zc=''; }
+  }
+  if(zc.trim()) zparts.push(zc.trim());
+  return good.map((p, i) => ({ en: p, zh: zparts.length === good.length ? zparts[i] : (i===0 ? one.zh : '') }));
+}
+
 /* 浏览器直接调百炼 */
 async function vlmDirect(cfg, blob){
   const b64 = await new Promise((res,rej)=>{
@@ -876,10 +906,14 @@ async function aiOcr(files, onProgress){
     sRaw.push(s);
   }
 
+  // 一段里塞了好几句的，先切开（否则句子排序会一次甩出十几个词）
+  const sSplit = [];
+  for(const s of sRaw) sSplit.push(...splitMultiSentences(s.en, s.zh));
+
   // 去重（跨表也算重复）
   const seen=new Set(), W=[], Ss=[];
   for(const w of wRaw){ const k=norm(w.en); if(k && !seen.has(k)){ seen.add(k); W.push({...w, kind:'word'}); } }
-  for(const s of sRaw){ const k=norm(s.en); if(k && !seen.has(k)){ seen.add(k); Ss.push({...s, kind:'sent'}); } }
+  for(const s of sSplit){ const k=norm(s.en); if(k && !seen.has(k)){ seen.add(k); Ss.push({...s, kind:'sent'}); } }
   acc.words=W; acc.sentences=Ss;
   return acc;
 }
@@ -1960,7 +1994,7 @@ function vOrder(q){
   </div>`;
   bindBack();
   function draw(){
-    $('#ansLine').innerHTML = chosen.map((w,i)=>`<button class="wt" data-i="${i}">${esc(w)}</button>`).join('') || '<span style="color:#94A3B8;font-size:14px;align-self:center">点下面的词，按顺序排好…</span>';
+    $('#ansLine').innerHTML = chosen.map((w,i)=>`<button class="wt" data-i="${i}">${esc(w && w.t != null ? w.t : w)}</button>`).join('') || '<span style="color:#94A3B8;font-size:14px;align-self:center">点下面的词，按顺序排好…</span>';
     $('#pool').innerHTML = pool.map((w,i)=>`<button class="wt ${w._used?'used':''}" data-i="${i}">${esc(w.t)}</button>`).join('');
     $$('#ansLine .wt').forEach(b=>b.onclick=()=>{ if(Run.locked)return; const i=+b.dataset.i;
       const item=chosen.splice(i,1)[0]; const p=pool.find(x=>x.id===item.id); if(p) p._used=false; draw(); });
