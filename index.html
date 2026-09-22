@@ -206,6 +206,7 @@ textarea#rawText:focus{outline:none;border-color:var(--blue);}
   font-size:24px;font-weight:900;color:var(--blue-d);text-transform:lowercase;
 }
 .slot.filled{border-style:solid;border-color:var(--blue);background:var(--blue-l);}
+.slot.fixed{border-color:#FCD34D;background:var(--amber-l);color:#92400E;}
 .slot.sp{
   width:28px;border-style:solid;border-color:#E2E8F0;background:#F8FAFC;
   color:#94A3B8;font-size:15px;font-weight:700;
@@ -756,8 +757,15 @@ const OCR_PROMPT = `你是英语教材内容提取助手。从这张课本照片
 - 宁可少给，也不要凑数。拿不准的一律不要。
 - 同一页里重复出现的只留一次。
 
+【输出前必须自查拼写 ← 很重要】
+把 words 和 sentences 里的英文**逐个字母核对一遍**：
+- 有拼错的（长单词尤其容易看错，如 traditional / beautiful / delicious），
+  直接把结果里改成**正确拼法**，并把改动记进 fixed 数组。
+- 中文意思写错或不够准的，一并改掉，同样记进 fixed（from 写错的，to 写对的）。
+- 拼写有疑问又拿不准的，宁可不放这一条。
+
 【输出】只输出 JSON，不要解释，不要 markdown 代码块：
-{"words":[{"en":"apple","zh":"苹果"}],"sentences":[{"en":"I like apples.","zh":"我喜欢苹果。"}],"ignored":"一句话说明你忽略了哪些东西"}`;
+{"words":[{"en":"apple","zh":"苹果"}],"sentences":[{"en":"I like apples.","zh":"我喜欢苹果。"}],"fixed":[{"from":"traditonal","to":"traditional"}],"ignored":"一句话说明你忽略了哪些东西"}`;
 
 const INSTRUCTION_WORDS = new Set(('read write listen say look match choose fill answer complete tick circle '+
   'underline translate repeat practise practice total score name class grade date page unit lesson part '+
@@ -836,7 +844,8 @@ async function aiOcr(files, onProgress){
     if(direct){
       const data = await vlmDirect(direct, blob);
       j = { ok:true, model: direct.model || 'qwen3-vl-plus',
-            words: data.words || [], sentences: data.sentences || [], ignored: data.ignored || '' };
+            words: data.words || [], sentences: data.sentences || [],
+            fixed: data.fixed || [], ignored: data.ignored || '' };
     }else{
       const r = await fetch('api/ocr', {
         method:'POST',
@@ -850,6 +859,7 @@ async function aiOcr(files, onProgress){
     acc.sentences = acc.sentences.concat((j.sentences||[]).map(s=>({en:s.en, zh:s.zh||'', kind:'sent'})));
     acc.model = j.model || acc.model;
     acc.ms = (acc.ms||0) + (j.ms||0);
+    if(Array.isArray(j.fixed) && j.fixed.length) acc.fixed = (acc.fixed||[]).concat(j.fixed);
     if(j.ignored) acc.ignored = (acc.ignored ? acc.ignored + '；' : '') + j.ignored;
   }
   /* 本地再兜一道过滤 + 分流：
@@ -1236,6 +1246,7 @@ async function doRecognize(files){
     toast('识别完成');
     S.done = {};
     S.ignored = r.ignored || '';
+    S.fixed = r.fixed || [];
     AI_STATE='ready'; AI_LAST_ERROR='';
     clearRun(); saveSession();
     go('review');
@@ -1332,6 +1343,9 @@ function renderReview(){
       <textarea id="rawText2" style="width:100%;min-height:110px;border-radius:14px;border:2px solid var(--line);padding:11px;font-size:14px;line-height:1.7">${esc($('#rawText') ? $('#rawText').value : '')}</textarea>
       <button class="btn sm ghost" id="btnReparse" style="margin-top:10px">🔄 重新拆分</button>
       ${S.ignored?`<p class="sub" style="margin:10px 0 0;color:#B45309">🤖 已自动忽略：${esc(S.ignored)}</p>`:''}
+      ${(S.fixed&&S.fixed.length)?`<p class="sub" style="margin:8px 0 0;color:#15803D">✏️ 已自动修正拼写：${
+        S.fixed.map(f=>esc(f.from||'')+' → <b>'+esc(f.to||'')+'</b>').join('、')}</p>`:''}
+      <p class="sub" style="margin:10px 0 0;font-size:12.5px">带 <b style="color:#B45309">⚠️</b> 的是自动查出来"看着不太像正常单词"的，麻烦你扫一眼；改完直接点下面的按钮。</p>
     </div>
     <div class="card">
       <h2>📝 单词（${W.filter(w=>w.on).length}/${W.length}）</h2>
@@ -1386,11 +1400,21 @@ function renderReview(){
     S.done={}; clearRun(); saveSession(); go('levels');
   };
 }
+/* 本地兜底的"看着不像正常单词"检查 —— 模型自查漏了的，这里还能捞出来 */
+function suspiciousWord(en){
+  const bare = String(en||'').replace(/[^A-Za-z]/g,'');
+  if(bare.length >= 22) return '太长，可能是两行粘在一起';
+  if(bare.length >= 4 && !/[aeiou]/i.test(bare)) return '一个元音都没有，可能认错了';
+  if(/(.)\1\1/i.test(bare)) return '连续三个相同字母，可能认错了';
+  return '';
+}
 function wordRow(w,i){
+  const warn = suspiciousWord(w.en);
   return `<div class="item">
     <input type="checkbox" class="pick" data-i="${i}" ${w.on?'checked':''} style="width:22px;height:22px;accent-color:#2563EB">
     <input type="text" class="en" data-i="${i}" data-f="en" value="${esc(w.en)}">
     <input type="text" class="zh" data-i="${i}" data-f="zh" value="${esc(w.zh)}" placeholder="中文…">
+    ${warn?`<span class="tag" title="${esc(warn)}" style="background:#FEE2E2;color:#B91C1C">⚠️</span>`:''}
     <button class="mv" data-i="${i}" title="这其实是句子 → 移到句子区">⇄</button>
     <button class="del" data-i="${i}">✕</button>
   </div>`;
@@ -1696,35 +1720,55 @@ function vChoose(q){
 }
 
 /* ---------- 2. 字母拼图 ---------- */
+const VOWELS = 'aeiou';
+const isVowel = ch => VOWELS.indexOf(String(ch).toLowerCase()) >= 0;
+
 function vSpell(q){
   const ans = q.answer;
   /* 多词答案（want to do sth / look after …）中间必须有空格：
-     把答案拆成「字母位 + 空格位」的模式，空格位直接显示出来，
-     孩子一眼能看出这题是几个单词、每个词几个字母。 */
+     把答案拆成「字母位 + 空格位」的模式，空格位直接显示出来。 */
   const words = ans.split(/\s+/).map(w=>w.replace(/[^A-Za-z'’]/g,'')).filter(Boolean);
   const list  = words.length ? words : [ans.replace(/[^A-Za-z'’]/g,'')];
-  const pattern = [];                       // {t:'L',ch} | {t:'S'}
+  const pattern = [];                       // {t:'L',ch,i} | {t:'S'}
+  let li = 0;
   list.forEach((w, wi)=>{
     if(wi>0) pattern.push({t:'S'});
-    w.split('').forEach(ch=>pattern.push({t:'L', ch}));
+    w.split('').forEach(ch=>pattern.push({t:'L', ch, i:li++}));
   });
-  const letters = pattern.filter(p=>p.t==='L').map(p=>p.ch);   // 只含字母，用于比对
+  const letters = pattern.filter(p=>p.t==='L').map(p=>p.ch);
+  const N = letters.length;
   const wordCount = list.length;
 
-  let pool = shuffle(letters.map((c,i)=>({c, id:i})));
-  // 若重复度太高（如 "aa"），补两个干扰字母
-  if(uniq(letters.map(l=>l.toLowerCase())).length<=2 && letters.length<=4){
-    const extra = shuffle('etaosrin'.split('')).slice(0,2);
-    extra.forEach((c,i)=>pool.push({c, id:1000+i}));
-    pool = shuffle(pool);
+  // built 与字母位一一对应：null 或 {c,id,fixed}
+  let built = new Array(N).fill(null);
+  let hinted = false;                       // 是否已经用了辅音提示
+  const answerStr = letters.join('').toLowerCase();
+
+  // 长单词才给「辅音提示」：有元音也有辅音、且够长
+  const hasV = letters.some(isVowel), hasC = letters.some(c=>!isVowel(c));
+  const canConsonantHint = N >= 6 && hasV && hasC;
+
+  function freshPool(){
+    let p = shuffle(letters.map((c,i)=>({c, id:i})));
+    if(uniq(letters.map(l=>l.toLowerCase())).length<=2 && N<=4){
+      shuffle('etaosrin'.split('')).slice(0,2).forEach((c,i)=>p.push({c, id:1000+i}));
+      p = shuffle(p);
+    }
+    return p;
   }
+  let pool = freshPool();
+  const emptyIdx = ()=> built.findIndex(b=>!b);
 
   $('#wrap').innerHTML = `<div class="screen">${playHeader()}
     <div class="qcard">
       <div class="q-zh">${esc(q.zh)}</div>
       <div class="q-hint">${wordCount>1
-        ? `<b style="color:#B45309">${wordCount} 个单词</b> · 共 ${letters.length} 个字母 · 单词之间要空格`
-        : `${letters.length} 个字母`}</div>
+        ? `<b style="color:#B45309">${wordCount} 个单词</b> · 共 ${N} 个字母 · 单词之间要空格`
+        : `${N} 个字母`}${canConsonantHint?' &nbsp;·&nbsp; 长单词，可以点下面的「给辅音」':''}</div>
+    </div>
+    <div class="row" style="margin-bottom:12px">
+      <button class="btn sm primary" id="btnSay">🔊 听发音</button>
+      ${canConsonantHint?'<button class="btn sm amber" id="btnCons">🔤 给辅音，我填元音</button>':''}
     </div>
     <div class="slots" id="slots"></div>
     <div class="tiles" id="tiles">
@@ -1741,49 +1785,92 @@ function vSpell(q){
     <div id="afterBox"></div>
   </div>`;
   bindBack();
-  let built = [];
+
   const slots=$('#slots');
   function draw(){
-    let li=0;
     slots.innerHTML = pattern.map(p=>{
       if(p.t==='S') return '<div class="slot sp" title="空格">␣</div>';
-      const b = built[li++];
-      return `<div class="slot ${b?'filled':''}">${b?esc(b.c.toLowerCase()):''}</div>`;
+      const b = built[p.i];
+      if(!b) return '<div class="slot"></div>';
+      return `<div class="slot filled${b.fixed?' fixed':''}">${esc(b.c.toLowerCase())}</div>`;
     }).join('');
-    $$('#tiles .tile').forEach(t=>t.classList.toggle('used', built.some(b=>String(b.id)===t.dataset.id)));
+    $$('#tiles .tile').forEach(t=>t.classList.toggle('used', built.some(b=>b && String(b.id)===t.dataset.id)));
   }
-  draw();
-  $$('#tiles .tile').forEach(t=>t.onclick=()=>{
+  function renderTiles(){
+    $('#tiles').innerHTML = pool.map(t=>`<button class="tile" data-id="${t.id}" data-c="${esc(t.c)}">${esc(t.c.toLowerCase())}</button>`).join('');
+    $$('#tiles .tile').forEach(t=>t.onclick=()=>tap(t));
+    draw();
+  }
+  function tap(t){
     if(Run.locked) return;
-    if(built.length>=letters.length) return;
-    built.push({id:t.dataset.id, c:t.dataset.c}); draw(); beep('tap');
-    if(built.length===letters.length) check(true);
-  });
-  $('#btnUndo').onclick = ()=>{ if(Run.locked)return; built.pop(); draw(); };
-  $('#btnClear').onclick= ()=>{ if(Run.locked)return; built=[]; draw(); };
+    const k = emptyIdx();
+    if(k < 0) return;
+    built[k] = {id:t.dataset.id, c:t.dataset.c};
+    draw(); beep('tap');
+    if(emptyIdx() < 0) check(true);
+  }
+
+  /* 语音：这一关本来就是"听音拼词"，进题目自动念一次，随时可重听 */
+  const say = ()=> speakWait(q.answer, .74);
+  $('#btnSay').onclick = say;
+
+  /* 长单词给辅音：把辅音直接填好并锁住，字母块只剩元音（+2 个干扰元音） */
+  if($('#btnCons')) $('#btnCons').onclick = ()=>{
+    if(Run.locked || hinted) return;
+    hinted = true;
+    letters.forEach((c,i)=>{ if(!isVowel(c)) built[i] = {c, id:'F'+i, fixed:true}; });
+    const vs = letters.filter(isVowel);
+    let vp = vs.map((c,i)=>({c, id:'V'+i}));
+    shuffle('aeiou'.split('')).slice(0,2).forEach((c,i)=>vp.push({c, id:'X'+i}));
+    pool = shuffle(vp);
+    $('#btnCons').disabled = true;
+    $('#btnCons').textContent = '🔤 已给辅音';
+    renderTiles();
+    say();
+    toast('辅音已填好，把元音填进去就行', 1600);
+  };
+
+  renderTiles();
+  say();                                   // 进题目先念一遍，陌生单词也有抓手
+
+  $('#btnUndo').onclick = ()=>{
+    if(Run.locked) return;
+    for(let i=N-1;i>=0;i--){ if(built[i] && !built[i].fixed){ built[i]=null; break; } }
+    draw();
+  };
+  $('#btnClear').onclick = ()=>{
+    if(Run.locked) return;
+    for(let i=0;i<N;i++) if(!built[i] || !built[i].fixed) built[i]=null;
+    draw();
+  };
   $('#btnHint').onclick = ()=>{
     if(Run.locked) return;
-    built=[]; built.push({id:'-1', c:letters[0]}); draw(); beep('tap');
+    for(let i=0;i<N;i++) if(!built[i] || !built[i].fixed) built[i]=null;
+    built[0] = {id:'-1', c:letters[0]};
+    draw(); beep('tap'); say();
   };
   $('#btnCheck').onclick = ()=>check(false);
 
   function check(auto){
     if(Run.locked) return;
-    if(built.length<letters.length){ toast('还没拼完哦'); return; }
+    if(emptyIdx() >= 0){ toast('还没拼完哦'); return; }
     const val = built.map(b=>b.c).join('').toLowerCase();
-    const ok = val === letters.join('').toLowerCase();
+    const ok = val === answerStr;
     if(!ok){
       const host=$('#slots'); host.classList.add('shake');
       setTimeout(()=>host.classList.remove('shake'),420);
       const ended = onWrongAnswer(q, q.answer, ()=>{
-        built = letters.map((c,i)=>({id:'R'+i, c})); draw();   // 把正确拼写摆出来
+        built = letters.map((c,i)=>({id:'R'+i, c, fixed:true})); draw();   // 把正确拼写摆出来
       });
-      if(!ended && auto && built.length){ built.pop(); draw(); }  // 自动填满但拼错：退一格给机会改
+      if(!ended && auto){
+        for(let i=N-1;i>=0;i--){ if(built[i] && !built[i].fixed){ built[i]=null; break; } }
+        draw();                              // 自动填满但拼错：退一格给机会改
+      }
       return;
     }
     Run.locked=true;
     scoreMark(true, Run.tries===0);
-    gotoNext();
+    finishAnswer(q.answer, .74);
   }
 }
 
