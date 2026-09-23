@@ -168,6 +168,10 @@ textarea#rawText:focus{outline:none;border-color:var(--blue);}
 .pbar{display:flex;align-items:center;gap:10px;margin-bottom:12px;}
 .pbar .progress{flex:1;}
 .pbar .cnt{font-size:13px;font-weight:800;color:var(--ink2);white-space:nowrap;}
+.escapebar{display:flex;align-items:center;gap:10px;margin-bottom:12px;}
+.escapebar .tries{font-size:12.5px;font-weight:800;color:var(--ink2);white-space:nowrap;}
+.escapebar .tries b{color:#B45309;font-size:14px;}
+.escapebar .btn{flex:1;min-height:44px;font-size:14px;}
 .qcard{
   background:#fff;border-radius:22px;padding:20px 16px;box-shadow:var(--shadow);
   text-align:center;margin-bottom:14px;
@@ -579,10 +583,10 @@ function parseBlocks(text){
     if(isSent){
       let s = en.replace(/\s+([\.\,\?\!\;\:])/g,'$1').trim();
       if(s && !/[\.\?\!]$/.test(s)) s += '.';
-      sents.push({en:s, zh:zh||'', kind:'sent'});
+      sents.push({en:s, zh:cleanZh(zh), kind:'sent'});
     }else{
       const w = en.replace(/[\.\,\?\!\;\:]+$/,'').trim();
-      if(w) words.push({en:w, zh:zh||'', kind:'word'});
+      if(w) words.push({en:w, zh:cleanZh(zh), kind:'word'});
     }
   }
   // 去重
@@ -914,7 +918,7 @@ async function aiOcr(files, onProgress){
   // 去重（跨表也算重复）
   const seen=new Set(), W=[], Ss=[];
   for(const w of wRaw){ const k=norm(w.en); if(k && !seen.has(k)){ seen.add(k); W.push({...w, kind:'word'}); } }
-  for(const s of sSplit){ const k=norm(s.en); if(k && !seen.has(k)){ seen.add(k); Ss.push({...s, kind:'sent'}); } }
+  for(const s of sSplit){ const k=norm(s.en); if(k && !seen.has(k)){ seen.add(k); Ss.push({...s, zh: cleanZh(s.zh), kind:'sent'}); } }
   acc.words=W; acc.sentences=Ss;
   return acc;
 }
@@ -1488,7 +1492,8 @@ function activeLevels(){
   const out=[];
   if(w.length>=2){ out.push('choose','spell'); if(w.length>=3) out.push('listen'); }
   else if(w.length===1){ out.push('spell'); }
-  if(s.length>=2){ out.push('cloze','order'); }
+  if(s.length>=2){ out.push('cloze'); }
+  if(orderPool().length>=2){ out.push('order'); }   // 没有 3~9 词的干净句子就不出这一关
   if(w.length||s.length) out.push('write');
   return LEVELS.filter(l=>out.includes(l.id));
 }
@@ -1537,6 +1542,37 @@ function renderLevels(){
    ========================================================= */
 const CAP = 10;
 function take(arr,n){ const s=shuffle(arr); return s.slice(0, Math.min(n, s.length)); }
+
+/* ---------- 句子排序的"能不能用"判断 ----------
+   孩子要拿词块拼句子，所以：太长排不动、有缩写会拆出单字母、有碎片会漏块。
+   这些一律不出题（那句话仍然会出现在句子填空和默写里）。 */
+const ABBR_RE = /\b(e\.g|i\.e|etc|Mr|Mrs|Ms|Dr|St|vs|No|Fig|Ph)\./i;
+function orderTokens(en){
+  return (String(en||'').match(/[A-Za-z0-9'\-]+/g) || []);
+}
+function orderCleanTokens(en){
+  return orderTokens(en).filter(t => /^([aAiI]|\d+)$/.test(t) || t.length > 1);
+}
+function orderOK(en){
+  const s = String(en||'').trim();
+  if(ABBR_RE.test(s)) return false;                       // 含 e.g. / Mr. 之类，会拆出单字母
+  const all = orderTokens(s);
+  const clean = orderCleanTokens(s);
+  if(clean.length !== all.length) return false;           // 有被丢掉的碎片，不用
+  return clean.length >= 3 && clean.length <= 9;          // 3~9 个词最舒服
+}
+function orderPool(){
+  return S.sents.filter(x => x.on && x.en && orderOK(x.en));
+}
+
+/* 中文释义里常混进「例如：…」这类课本说明，砍掉 */
+function cleanZh(zh){
+  let z = String(zh||'').trim();
+  z = z.replace(/[（(]?\s*(例如|比如|例|如)\s*[:：][\s\S]*$/,'').trim();
+  z = z.replace(/[（(]?\s*e\.?g\.?\s*[:：][\s\S]*$/i,'').trim();
+  return z;
+}
+
 function distractors(correct, pool, n){
   const c = norm(correct);
   const cand = uniq(pool.map(x=>x).filter(x=>norm(x)!==c && x && norm(x).length>0));
@@ -1577,11 +1613,10 @@ function buildQuestions(levelId){
     });
   }
   if(levelId==='order'){
-    return take(Ss, hard?8:6).map(s=>{
-      let toks = (s.en.match(/[A-Za-z0-9'\-]+|[.,!?;:]/g)||[]);
-      const words = toks.filter(t=>/[A-Za-z0-9]/.test(t));
-      return {kind:'order', answer:s.en, tokens:shuffle(words), words, zh:s.zh||'', entry:s};
-    }).filter(q=>q.words.length>=2);
+    return take(orderPool(), hard?8:6).map(s=>{
+      const words = orderCleanTokens(s.en);        // 只含完整单词，不会出现 e / g 这种碎片
+      return {kind:'order', answer:s.en, tokens:shuffle(words), words, zh:cleanZh(s.zh)||s.zh||'', entry:s};
+    });
   }
   if(levelId==='write'){
     const qs=[];
@@ -1652,21 +1687,48 @@ function startLevel(id, overrideQs){
 }
 function playHeader(extra){
   const lv = LEVELS.find(l=>l.id===Run.id)||{icon:'🎮',nm:''};
+  const left = Math.max(0, MAX_TRIES - (Run.tries||0));
   return `<div class="pbar">
     <button class="bar-btn" id="qBack">←</button>
     <div class="progress"><i style="width:${(Run.i/Run.qs.length*100).toFixed(1)}%"></i></div>
     <div class="cnt">${Run.i+1}/${Run.qs.length} · ⭐${Run.stars}</div>
   </div>
-  <div class="center" style="margin-bottom:10px;font-size:13px;color:#6B7280;font-weight:800">${lv.icon} ${lv.nm}</div>
+  <div class="center" style="margin-bottom:8px;font-size:13px;color:#6B7280;font-weight:800">${lv.icon} ${lv.nm}</div>
+  <div class="escapebar">
+    <span class="tries">机会 <b id="tryLeft">${left}</b>/${MAX_TRIES}</span>
+    <button class="btn sm ghost" id="btnGiveUp">🆘 我卡住了，看答案</button>
+  </div>
   ${extra||''}`;
 }
 function renderQ(){
   const q = Run.qs[Run.i];
   Run.locked=false;
   Run.tries=0;                                 // 每道题 3 次机会，重新开始数
+  Run.reveal=null;
   stopSpeak();                                 // 换题先掐断上一条语音，绝不让它串到下一题
   saveRun();                                   // 每换一题就落盘，误触返回也丢不了
   ({choose:vChoose, spell:vSpell, listen:vListen, cloze:vCloze, order:vOrder, write:vWrite}[q.kind])(q);
+  bindGiveUp();
+}
+function bindGiveUp(){
+  const b=$('#btnGiveUp'); if(b) b.onclick = giveUp;
+}
+function refreshTryLeft(){
+  const el=$('#tryLeft'); if(el) el.textContent = Math.max(0, MAX_TRIES - (Run.tries||0));
+}
+/* 兜底出口：孩子卡住了（排不完 / 拼不完 / 就是不会），随时能看答案走人。
+   代价是这题不给星，也不影响后面。 */
+function giveUp(){
+  if(Run.locked) return;
+  const q = Run.qs[Run.i]; if(!q) return;
+  Run.locked = true;
+  scoreMark(false);
+  markWrong(q.entry, q.kind);
+  if(typeof Run.reveal === 'function'){ try{ Run.reveal(); }catch(e){} }
+  const sayText = q.kind==='cloze' ? (q.full||q.answer) : q.answer;
+  speakWait(sayText, .75);
+  showNextBar(sayText);
+  toast('没关系，看懂了再往下走 💪', 1800);
 }
 function bindBack(){
   const b=$('#qBack'); if(b) b.onclick=exitLevel;
@@ -1688,12 +1750,15 @@ function finishAnswer(sayText, rate){
    答错不再直接冲走：给 3 次机会，第 3 次才公布答案，
    然后停下来等用户自己点「下一题」——留足时间消化。
    ========================================================= */
-function onWrongAnswer(q, sayText, revealFn, hintFn){
+function onWrongAnswer(q, sayText, revealFn, hintFn, why){
   Run.tries = (Run.tries||0) + 1;
+  refreshTryLeft();
   if(Run.tries < MAX_TRIES){
     beep('bad');
     if(hintFn && Run.tries >= 2) hintFn();          // 第 2 次失败给个提示（比如排掉一个错选项）
-    toast(Run.tries === 1 ? '再想想，还有 2 次机会' : '最后一次机会，加油！', 1500);
+    const left = MAX_TRIES - Run.tries;
+    const tail = left === 1 ? '最后一次机会，加油！' : ('还有 ' + left + ' 次机会');
+    toast((why ? why + '，' : '再想想，') + tail, 1600);
     return false;                                    // 留在原地重试
   }
   // 第 3 次：公布答案 + 念正确语音 + 出现「下一题」按钮
@@ -1739,15 +1804,15 @@ function vChoose(q){
     <div id="afterBox"></div>
   </div>`;
   bindBack();
+  const reveal = ()=>{ $$('#opts .opt').forEach(x=>{ if(norm(x.dataset.o)===norm(q.answer)) x.classList.add('good'); }); };
+  Run.reveal = reveal;
   $$('#opts .opt').forEach(b=>b.onclick=()=>{
     if(Run.locked) return;
     const ok = norm(b.dataset.o)===norm(q.answer);
     if(!ok){
       // 防作弊：选错的那个直接禁用（不能对同一个选项反复乱点凑次数）
       b.classList.add('bad'); b.disabled = true;
-      onWrongAnswer(q, q.answer, ()=>{
-        $$('#opts .opt').forEach(x=>{ if(norm(x.dataset.o)===norm(q.answer)) x.classList.add('good'); });
-      });
+      onWrongAnswer(q, q.answer, reveal);
       return;
     }
     Run.locked=true;
@@ -1851,6 +1916,9 @@ function vSpell(q){
   /* 语音：这一关本来就是"听音拼词"，进题目自动念一次，随时可重听 */
   const say = ()=> speakWait(q.answer, .74);
   $('#btnSay').onclick = say;
+  // 公布答案 = 把正确拼写摆出来（卡住时和错满 3 次时都用这个）
+  const revealSpell = ()=>{ built = letters.map((c,i)=>({id:'R'+i, c, fixed:true})); draw(); };
+  Run.reveal = revealSpell;
 
   /* 长单词给辅音：把辅音直接填好并锁住，字母块只剩元音（+2 个干扰元音） */
   if($('#btnCons')) $('#btnCons').onclick = ()=>{
@@ -1891,15 +1959,17 @@ function vSpell(q){
 
   function check(auto){
     if(Run.locked) return;
-    if(emptyIdx() >= 0){ toast('还没拼完哦'); return; }
+    if(emptyIdx() >= 0){
+      // 没拼完也算一次"卡住"：不能靠一直不拼完把题目无限拖下去
+      onWrongAnswer(q, q.answer, revealSpell, null, '还没拼完');
+      return;
+    }
     const val = built.map(b=>b.c).join('').toLowerCase();
     const ok = val === answerStr;
     if(!ok){
       const host=$('#slots'); host.classList.add('shake');
       setTimeout(()=>host.classList.remove('shake'),420);
-      const ended = onWrongAnswer(q, q.answer, ()=>{
-        built = letters.map((c,i)=>({id:'R'+i, c, fixed:true})); draw();   // 把正确拼写摆出来
-      });
+      const ended = onWrongAnswer(q, q.answer, revealSpell);
       if(!ended && auto){
         for(let i=N-1;i>=0;i--){ if(built[i] && !built[i].fixed){ built[i]=null; break; } }
         draw();                              // 自动填满但拼错：退一格给机会改
@@ -1926,6 +1996,8 @@ function vListen(q){
     <div id="afterBox"></div>
   </div>`;
   bindBack();
+  const reveal2 = ()=>{ $$('#opts .opt').forEach(x=>{ if(norm(x.dataset.o)===norm(q.answer)) x.classList.add('good'); }); };
+  Run.reveal = reveal2;
   $('#btnPlay').onclick = ()=>speakWait(q.answer, .78);
   speakWait(q.answer, .78);
   $$('#opts .opt').forEach(b=>b.onclick=()=>{
@@ -1933,9 +2005,7 @@ function vListen(q){
     const ok = norm(b.dataset.o)===norm(q.answer);
     if(!ok){
       b.classList.add('bad'); b.disabled = true;
-      onWrongAnswer(q, q.answer, ()=>{
-        $$('#opts .opt').forEach(x=>{ if(norm(x.dataset.o)===norm(q.answer)) x.classList.add('good'); });
-      });
+      onWrongAnswer(q, q.answer, reveal2);
       return;
     }
     Run.locked=true;
@@ -1961,15 +2031,17 @@ function vCloze(q){
     <div id="afterBox"></div>
   </div>`;
   bindBack();
+  const reveal3 = ()=>{
+    const bk=$('#bk'); if(bk) bk.textContent = k;
+    $$('#opts .opt').forEach(x=>{ if(norm(x.dataset.o)===norm(k)) x.classList.add('good'); });
+  };
+  Run.reveal = reveal3;
   $$('#opts .opt').forEach(b=>b.onclick=()=>{
     if(Run.locked) return;
     const ok = norm(b.dataset.o)===norm(k);
     if(!ok){
       b.classList.add('bad'); b.disabled = true;
-      onWrongAnswer(q, q.full, ()=>{
-        const bk=$('#bk'); if(bk) bk.textContent = k;
-        $$('#opts .opt').forEach(x=>{ if(norm(x.dataset.o)===norm(k)) x.classList.add('good'); });
-      });
+      onWrongAnswer(q, q.full, reveal3);
       return;
     }
     Run.locked=true;
@@ -2007,17 +2079,23 @@ function vOrder(q){
   }
   pool = q.tokens.map((t,i)=>({t, id:i, _used:false}));
   draw();
+  // 公布答案 = 把正确顺序摆出来
+  const revealOrder = ()=>{ $('#ansLine').innerHTML = q.words.map(w=>`<button class="wt">${esc(w)}</button>`).join(''); };
+  Run.reveal = revealOrder;
   $('#btnUndo2').onclick=()=>{ if(Run.locked)return; const c=chosen.pop(); if(c){const p=pool.find(x=>x.id===c.id); if(p)p._used=false;} draw(); };
   $('#btnCheck2').onclick=()=>{
     if(Run.locked) return;
-    if(chosen.length<q.words.length){ toast('还没排完哦'); return; }
+    if(chosen.length<q.words.length){
+      // 没排完也算一次"卡住"：否则孩子卡在这里永远拿不到答案
+      onWrongAnswer(q, q.answer, revealOrder, null, '还没排完');
+      if(!Run.locked){ chosen.forEach(c=>{ const p=pool.find(x=>x.id===c.id); if(p) p._used=false; }); chosen=[]; draw(); }
+      return;
+    }
     const val = chosen.map(x=>x.t).join(' ');
     const ok = norm(val)===norm(q.words.join(' '));
     if(!ok){
       $('#ansLine').classList.add('shake'); setTimeout(()=>$('#ansLine').classList.remove('shake'),420);
-      const ended = onWrongAnswer(q, q.answer, ()=>{
-        $('#ansLine').innerHTML = q.words.map(w=>`<button class="wt">${esc(w)}</button>`).join('');  // 摆出正确顺序
-      });
+      const ended = onWrongAnswer(q, q.answer, revealOrder);
       if(!ended){                                  // 还没到第 3 次：把词放回词池让他重排
         chosen.forEach(c=>{ const p=pool.find(x=>x.id===c.id); if(p) p._used=false; });
         chosen=[]; draw();
@@ -2069,7 +2147,7 @@ function vWrite(q){
     <div id="afterBox"></div>
   </div>`;
   bindBack();
-  $$('.chips .chip').forEach(c=>c.onclick=()=>{ if(Run.locked) return; S.writeMode=c.dataset.m; vWrite(q); });
+  $$('.chips .chip').forEach(c=>c.onclick=()=>{ if(Run.locked) return; S.writeMode=c.dataset.m; vWrite(q); bindGiveUp(); });
 
   /* 手写模式的「写错了」也是自评 → 公布答案后停下来等他点下一题 */
   const finishWrongHand = ()=>{
@@ -2084,6 +2162,7 @@ function vWrite(q){
   if(S.writeMode==='hand'){
     const cv=$('#cv');
     setupCanvas(cv);
+    Run.reveal = ()=>{ $('#ansBox').innerHTML = `<div class="answer bad">❌ 正确答案：${esc(q.answer)}</div>`; };
     const letters = q.answer.replace(/[^A-Za-z]/g,'').length;
     const setTool = t=>{
       cv._tool = t;
@@ -2117,6 +2196,7 @@ function vWrite(q){
     };
   }else{
     const ti=$('#ti');
+    Run.reveal = ()=>{ $('#ansBox').innerHTML = `<div class="answer bad">❌ 正确答案：${esc(q.answer)}</div>`; };
     setTimeout(()=>ti.focus(),200);
     const submit = ()=>{
       if(Run.locked) return;
