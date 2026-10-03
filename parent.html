@@ -63,6 +63,8 @@ const $=id=>document.getElementById(id);
 const esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const date=x=>x?new Date(x).toLocaleString('zh-CN'):'';
 let app,child='dabao',archive=null,updatedAt=0,mode='login',request=0;
+const setupCode=new URLSearchParams(location.hash.slice(1)).get('activate')||'';
+if(setupCode) try{history.replaceState(null,'',location.pathname+location.search)}catch{}
 async function cloud(){
   if(app) return app;
   const sdk=await import('./cloudbase-sdk.js');
@@ -89,17 +91,21 @@ function selectMode(next){
   $('loginTab').classList.toggle('selected',next==='login');
   $('registerTab').classList.toggle('selected',next==='register');
   $('authSubmit').textContent=next==='login'?'登录':'创建家长账号';
-  $('authHint').textContent=next==='login'?'用默写项目自己的家长账号登录。':'第一次使用时创建一次，以后电脑和手机都用它登录。';
+  $('authHint').textContent=next==='login'?'用默写项目自己的家长账号登录。':
+    setupCode?'第一次使用时创建一次，以后电脑和手机都用它登录。':'首次开通请使用专属开通链接。';
   $('authStatus').textContent='';
 }
 $('loginTab').onclick=()=>selectMode('login');
 $('registerTab').onclick=()=>selectMode('register');
+if(setupCode) selectMode('register');
 $('authForm').onsubmit=async event=>{
   event.preventDefault();
   const button=$('authSubmit');button.disabled=true;
   $('authStatus').textContent='正在连接…';$('authStatus').className='status';
   try{
-    const result=await call('moxieAuth',{action:mode,email:$('email').value,password:$('password').value});
+    if(mode==='register'&&!setupCode) throw Error('首次开通请使用专属开通链接');
+    const result=await call('moxieAuth',{action:mode,email:$('email').value,password:$('password').value,
+      ...(mode==='register'?{setupCode}:{})});
     const client=await cloud();
     await client.auth().signInWithCustomTicket(()=>Promise.resolve(result.ticket));
     $('password').value='';
