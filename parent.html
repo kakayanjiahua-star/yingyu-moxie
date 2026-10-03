@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>家长查看 · 英语默写小闯关</title>
+<style>
+:root{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#182437;background:#f3f6fd}
+*{box-sizing:border-box}body{margin:0}button,input,select{font:inherit}button{cursor:pointer}
+.shell{max-width:900px;margin:auto;padding:22px 18px 48px}
+header{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:22px}
+h1{font-size:27px;line-height:1.2;margin:0}h2{font-size:19px;margin:0 0 14px}
+.muted{color:#667489;font-size:14px}.eyebrow{font-size:13px;font-weight:700;color:#2463df;margin:0 0 5px}
+.card{background:white;border:1px solid #e1e8f2;border-radius:20px;padding:20px;margin:0 0 14px;box-shadow:0 8px 24px #263b5b0b}
+.auth{max-width:460px;margin:48px auto}.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.grow{flex:1}label{display:block;font-size:14px;font-weight:700;margin:14px 0 7px}
+input,select{border:1px solid #cad5e4;border-radius:12px;background:white;padding:12px 13px;color:#182437;min-height:44px}
+input{width:100%}select{min-width:160px}.primary{background:#2164e7;color:white;border:0;border-radius:12px;padding:12px 18px;font-weight:800;min-height:44px}
+.quiet{background:white;color:#2356ba;border:1px solid #bfd1ed;border-radius:12px;padding:10px 14px;font-weight:700;min-height:44px}
+.tabs{display:flex;gap:9px;margin:16px 0}.tab{flex:1}.selected{background:#dfeafe;color:#164bad;border-color:#a4c1f2}
+.status{min-height:22px;margin:12px 0;color:#586b82}.error{color:#b91c1c}
+.pill{padding:11px 20px}.summary{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px}
+.metric{background:#eaf2ff;border-radius:14px;padding:15px}.metric b{display:block;font-size:25px}.metric span{font-size:13px;color:#55667b}
+.item{padding:11px 0;border-top:1px solid #e9eef6;font-size:14px;line-height:1.5}
+.item:first-of-type{border:0}.item strong{display:block;font-size:16px}.code{font-size:27px;letter-spacing:.13em;font-weight:900;margin:14px 0 3px}
+.filter{display:flex;gap:10px;flex-wrap:wrap;margin:4px 0 14px}.filter select{flex:1}
+.toplink{color:#2356ba;font-weight:700;text-decoration:none;font-size:14px}
+.empty{color:#667489;margin:8px 0 0;font-size:14px}
+@media(max-width:600px){.shell{padding:18px 12px 34px}h1{font-size:23px}.card{padding:17px}.summary{grid-template-columns:repeat(3,1fr)}.metric{padding:11px}.metric b{font-size:20px}.metric span{font-size:11px}.filter select{min-width:0}}
+</style>
+</head>
+<body>
+<main class="shell">
+  <header><div><p class="eyebrow">英语默写小闯关</p><h1>家长查看</h1></div><a class="toplink" href="./">孩子入口 ↗</a></header>
+  <section id="authPanel" class="card auth" hidden>
+    <h2>查看大宝、小宝的学习记录</h2>
+    <div class="tabs"><button id="loginTab" class="quiet tab selected" type="button">登录</button><button id="registerTab" class="quiet tab" type="button">首次使用</button></div>
+    <form id="authForm">
+      <label for="email">邮箱</label><input id="email" type="email" autocomplete="username" required>
+      <label for="password">密码（至少 8 位）</label><input id="password" type="password" autocomplete="current-password" minlength="8" required>
+      <p id="authHint" class="muted">用默写项目自己的家长账号登录。</p>
+      <button id="authSubmit" class="primary" type="submit">登录</button>
+    </form>
+    <p id="authStatus" class="status" role="status"></p>
+  </section>
+  <section id="dashboard" hidden>
+    <div class="row" style="margin-bottom:14px"><button class="quiet pill selected" data-child="dabao" type="button">大宝</button><button class="quiet pill" data-child="xiaobao" type="button">小宝</button><span class="grow"></span><button id="signOut" class="quiet" type="button">退出</button></div>
+    <p id="syncStatus" class="status" role="status"></p>
+    <section class="card"><div class="row"><h2 class="grow" style="margin:0">连接孩子的 iPad</h2><button id="makeCode" class="primary" type="button">生成配对码</button></div><div id="pairResult"></div></section>
+    <div class="summary"><div class="metric"><b id="todayCount">0</b><span>今天练习</span></div><div class="metric"><b id="weekCount">0</b><span>近 7 天练习</span></div><div class="metric"><b id="wrongCount">0</b><span>待加强</span></div></div>
+    <div class="filter"><select id="sourceFilter" aria-label="资料来源"><option value="all">全部来源</option><option value="teacher">老师知识梳理</option><option value="textbook">课本</option><option value="worksheet">练习资料</option><option value="other">其他</option></select><select id="unitFilter" aria-label="Unit"><option value="all">全部 Unit</option></select></div>
+    <section class="card"><h2>具体错题</h2><div id="wrongList"></div></section>
+    <section class="card"><h2>接下来复习</h2><div id="dueList"></div></section>
+    <section class="card"><h2>最近练习</h2><div id="sessionList"></div></section>
+    <section class="card"><div class="row"><h2 class="grow" style="margin:0">资料</h2><button id="exportData" class="quiet" type="button">导出本地记录</button></div><div id="materialList"></div></section>
+  </section>
+</main>
+<script type="module">
+const ENV='kaka888-d5ghfuff1958de22c';
+const CHILD={dabao:'大宝',xiaobao:'小宝'};
+const SOURCE={teacher:'老师知识梳理',textbook:'课本',worksheet:'练习资料',other:'其他'};
+const $=id=>document.getElementById(id);
+const esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const date=x=>x?new Date(x).toLocaleString('zh-CN'):'';
+let app,child='dabao',archive=null,updatedAt=0,mode='login',request=0;
+async function cloud(){
+  if(app) return app;
+  const sdk=await import('./cloudbase-sdk.js');
+  app=(sdk.default||sdk).init({env:ENV});
+  return app;
+}
+async function call(name,data){
+  const client=await cloud(),auth=client.auth();
+  if(!auth.hasLoginState()) await auth.signInAnonymously();
+  const response=await client.callFunction({name,data});
+  const result=response.result;
+  if(result?.success) return result.data;
+  throw Error(result?.error?.message||'云端暂时无法连接');
+}
+function showLogin(message=''){
+  $('dashboard').hidden=true;$('authPanel').hidden=false;
+  $('authStatus').textContent=message;$('authStatus').className=message?'status error':'status';
+}
+function showDashboard(){
+  $('authPanel').hidden=true;$('dashboard').hidden=false;
+}
+function selectMode(next){
+  mode=next;
+  $('loginTab').classList.toggle('selected',next==='login');
+  $('registerTab').classList.toggle('selected',next==='register');
+  $('authSubmit').textContent=next==='login'?'登录':'创建家长账号';
+  $('authHint').textContent=next==='login'?'用默写项目自己的家长账号登录。':'第一次使用时创建一次，以后电脑和手机都用它登录。';
+  $('authStatus').textContent='';
+}
+$('loginTab').onclick=()=>selectMode('login');
+$('registerTab').onclick=()=>selectMode('register');
+$('authForm').onsubmit=async event=>{
+  event.preventDefault();
+  const button=$('authSubmit');button.disabled=true;
+  $('authStatus').textContent='正在连接…';$('authStatus').className='status';
+  try{
+    const result=await call('moxieAuth',{action:mode,email:$('email').value,password:$('password').value});
+    const client=await cloud();
+    await client.auth().signInWithCustomTicket(()=>Promise.resolve(result.ticket));
+    $('password').value='';
+    showDashboard();await refresh();
+  }catch(e){showLogin(e.message)}
+  finally{button.disabled=false}
+};
+$('signOut').onclick=async()=>{
+  try{await (await cloud()).auth().signOut()}catch{}
+  archive=null;showLogin();
+};
+document.querySelectorAll('[data-child]').forEach(button=>button.onclick=()=>{
+  child=button.dataset.child;
+  document.querySelectorAll('[data-child]').forEach(x=>x.classList.toggle('selected',x===button));
+  $('pairResult').textContent='';$('sourceFilter').value='all';$('unitFilter').innerHTML='<option value="all">全部 Unit</option>';
+  $('unitFilter').value='all';archive=null;void refresh();
+});
+$('makeCode').onclick=async()=>{
+  const button=$('makeCode');button.disabled=true;
+  try{
+    const result=await call('moxie',{action:'createPair',profileId:child});
+    $('pairResult').innerHTML='<p class="code">'+esc(result.code)+'</p><p class="muted">10 分钟内，在 '+CHILD[child]+' 的 iPad「设置」中输入。</p>';
+  }catch(e){$('pairResult').textContent=e.message}
+  finally{button.disabled=false}
+};
+$('sourceFilter').onchange=render;
+$('unitFilter').onchange=render;
+$('exportData').onclick=()=>{
+  if(!archive) return;
+  const blob=new Blob([JSON.stringify({schemaVersion:2,profileId:child,exportedAt:new Date().toISOString(),...archive},null,2)],{type:'application/json'});
+  const url=URL.createObjectURL(blob),a=document.createElement('a');
+  a.href=url;a.download='英语默写学习档案-'+CHILD[child]+'-'+new Date().toLocaleDateString('sv-SE')+'.json';
+  a.click();setTimeout(()=>URL.revokeObjectURL(url),30000);
+};
+function list(el,items,draw,empty){
+  $(el).innerHTML=items.length?items.map(draw).join(''):'<p class="empty">'+empty+'</p>';
+}
+function render(){
+  const data=archive||{materials:[],sessions:[],plan:[]};
+  const materials=Array.isArray(data.materials)?data.materials:[];
+  const sessions=Array.isArray(data.sessions)?data.sessions:[];
+  const plan=Array.isArray(data.plan)?data.plan:[];
+  const source=$('sourceFilter').value,unit=$('unitFilter').value;
+  const match=x=>(source==='all'||x.source===source)&&(unit==='all'||x.unit===unit);
+  const wrong=plan.filter(x=>match(x)&&(x.wrongCount||x.timeoutCount||x.skipCount));
+  const due=plan.filter(x=>match(x)&&x.due<=new Date().toLocaleDateString('sv-SE'));
+  const recent=sessions.map(s=>({...s,entries:(s.entries||[]).filter(match)})).filter(s=>s.entries.length).sort((a,b)=>b.at-a.at).slice(0,8);
+  const today=new Date().toLocaleDateString('sv-SE');
+  const week=new Date();week.setDate(week.getDate()-6);
+  $('todayCount').textContent=sessions.filter(s=>s.day===today).length;
+  $('weekCount').textContent=sessions.filter(s=>s.day>=week.toLocaleDateString('sv-SE')).length;
+  $('wrongCount').textContent=wrong.length;
+  $('exportData').disabled=!archive;
+  list('wrongList',wrong,x=>'<div class="item"><span class="muted">'+esc(x.unit)+' · '+esc(SOURCE[x.source]||'其他')+'</span><strong>'+esc(x.en)+'</strong>'+esc(x.zh)+'<br><span class="muted">写错 '+(x.wrongCount||0)+' 次 · 来不及 '+(x.timeoutCount||0)+' 次 · 跳过 '+(x.skipCount||0)+' 次 · 下次 '+esc(x.due)+'</span></div>','暂无待加强题');
+  list('dueList',due,x=>'<div class="item"><strong>'+esc(x.zh)+' → '+esc(x.en)+'</strong><span class="muted">'+esc(x.unit)+' · '+esc(x.due)+'</span></div>','今天没有到期题');
+  list('sessionList',recent,s=>'<div class="item"><strong>'+esc(s.day)+' · '+s.entries.length+' 题</strong><span class="muted">'+esc([...new Set(s.entries.map(e=>e.unit))].join('、'))+' · 写对 '+s.entries.filter(e=>e.ok&&!e.expired&&!e.skipped).length+' · 跳过 '+s.entries.filter(e=>e.skipped).length+'</span>'+(s.entries.some(e=>e.ok===false)?'<br>未掌握：'+esc(s.entries.filter(e=>e.ok===false).map(e=>e.en).join('、')):'')+'</div>','尚无默写记录');
+  list('materialList',materials.filter(match),m=>'<div class="item"><strong>'+esc(m.unit||'未分 Unit')+' · '+esc(m.title||SOURCE[m.source]||'资料')+'</strong><span class="muted">'+esc(SOURCE[m.source]||'其他')+' · A '+[...(m.words||[]),...(m.sents||[])].filter(x=>x.tier==='A').length+' · B '+[...(m.words||[]),...(m.sents||[])].filter(x=>x.tier==='B').length+' · C '+[...(m.words||[]),...(m.sents||[])].filter(x=>x.tier==='C').length+'</span></div>','尚无资料');
+}
+async function refresh(){
+  if($('dashboard').hidden) return;
+  const n=++request,selected=child;
+  $('syncStatus').textContent='正在读取 '+CHILD[selected]+' 的记录…';
+  try{
+    const result=await call('moxie',{action:'get',profileId:selected});
+    if(n!==request||selected!==child) return;
+    archive=typeof result.archive==='string'?JSON.parse(result.archive):result.archive;
+    updatedAt=result.updatedAt||0;
+    const units=[...new Set((archive?.materials||[]).map(x=>x.unit).filter(Boolean))].sort();
+    const chosen=$('unitFilter').value;
+    $('unitFilter').innerHTML='<option value="all">全部 Unit</option>'+units.map(x=>'<option value="'+esc(x)+'">'+esc(x)+'</option>').join('');
+    $('unitFilter').value=units.includes(chosen)?chosen:'all';
+    $('syncStatus').textContent=updatedAt?'最近同步：'+date(updatedAt):CHILD[selected]+' 尚无云端记录';
+    render();
+  }catch(e){if(n===request)$('syncStatus').textContent='更新失败：'+e.message}
+}
+setInterval(()=>{if(!$('dashboard').hidden)void refresh()},15000);
+try{
+  const client=await cloud();
+  if(client.auth().hasLoginState()){
+    showDashboard();
+    await refresh();
+    if($('syncStatus').textContent.startsWith('更新失败：')) showLogin();
+  }else showLogin();
+}catch(e){showLogin('云端暂时无法连接，请稍后重试')}
+</script>
+</body>
+</html>

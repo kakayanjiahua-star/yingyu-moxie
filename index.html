@@ -269,6 +269,10 @@ input.type:focus{outline:none;border-color:var(--blue);}
   border:2px solid #86EFAC;font-size:19px;font-weight:900;color:#15803D;word-break:break-word;
 }
 .answer.bad{background:var(--red-l);border-color:#FCA5A5;color:#B91C1C;}
+.choice-feedback{margin-top:12px;font-size:13px;font-weight:800;color:var(--blue);}
+.choice-next-track{height:8px;margin-top:7px;border-radius:99px;background:#DBEAFE;overflow:hidden;}
+.choice-next-track i{display:block;width:0;height:100%;background:var(--blue);animation:choice-next var(--choice-pause,3s) linear forwards;}
+@keyframes choice-next{to{width:100%}}
 
 /* result */
 .big-num{font-size:52px;font-weight:900;line-height:1;color:var(--amber);}
@@ -381,6 +385,27 @@ table.st td.d{text-align:left;font-weight:700;}
 .plan-row .sub{margin:2px 0 0}
 .plan-unit{margin:10px 0;border:1px solid var(--line);border-radius:12px;padding:10px 14px}
 .plan-unit summary{cursor:pointer;font-weight:800}
+.material-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 0;border-bottom:1px solid var(--line)}
+.material-row:last-child{border-bottom:0}
+.material-row .sub{margin:3px 0 0}
+.material-row>div{flex:1;min-width:0}
+.material-row .btn{flex:0 0 auto;width:auto;min-width:76px}
+.tier-select{border:1px solid var(--line);border-radius:9px;background:#fff;padding:5px;font-weight:800;color:var(--ink)}
+.settings-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.settings-grid label{font-weight:800;display:grid;gap:6px}
+.settings-grid input,.settings-grid select{width:100%;min-height:44px;border:2px solid var(--line);border-radius:11px;padding:8px;background:white;font:inherit}
+.profile-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+.profile-screen{min-height:calc(100dvh - 110px);display:flex;flex-direction:column;justify-content:center}
+.profile-card{min-height:180px;border:2px solid var(--line);border-radius:24px;background:white;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:14px;font-size:30px;font-weight:900;color:var(--ink);cursor:pointer}
+.profile-card.current{border-color:#2563eb;background:#eff6ff}
+.profile-card small{font-size:13px;font-weight:700;color:#64748b}
+@media (max-width:430px){.profile-grid{gap:12px}.profile-card{min-height:148px;font-size:26px}}
+body[data-font-size="large"] .screen{font-size:1.1em}
+body[data-font-size="large"] .sub{font-size:16px}
+body[data-font-size="large"] .btn{font-size:18px}
+body[data-font-size="extra"] .screen{font-size:1.22em}
+body[data-font-size="extra"] .sub{font-size:18px}
+body[data-font-size="extra"] .btn{font-size:20px}
 @media (max-width:430px){.dict-setting{grid-template-columns:1fr 1fr}.dict-source{grid-template-columns:1fr}.dict-prompt{padding:14px 4px}}
 @media (prefers-reduced-motion:reduce){.screen,#modal{animation:none!important}}
 </style>
@@ -392,6 +417,7 @@ table.st td.d{text-align:left;font-weight:700;}
   <button class="bar-btn" id="btnHome" title="回首页">🏠</button>
   <div class="bar-title" id="barTitle">英语默写小闯关</div>
   <div class="bar-right">
+    <button class="bar-btn" id="btnSettings" title="设置" aria-label="设置">⚙️</button>
     <button class="bar-btn" id="btnSound" title="声音开关">🔊</button>
     <button class="bar-btn" id="btnWrong" title="错词本">📕</button>
     <button class="bar-btn" id="btnStats" title="成绩">📊</button>
@@ -408,7 +434,7 @@ table.st td.d{text-align:left;font-weight:700;}
    英语默写小闯关 — 单文件版
    流程：拍照/粘贴 → 校对 → 闯关 → 默写测 → 错词本
    ========================================================= */
-const APP_VERSION = 'v2026-09-30.rc6'; // 发布候选版；上线前再刷正式版本号
+const APP_VERSION = 'v2026-10-03';
 const $  = (s,r=document)=>r.querySelector(s);
 const $$ = (s,r=document)=>[...r.querySelectorAll(s)];
 const esc = s => String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
@@ -419,9 +445,49 @@ const norm  = s=>String(s||'').replace(/[\u2018\u2019\u02BC\u201B]/g,"'").toLowe
 const uniq  = a=>[...new Set(a)];
 
 /* ---------- 持久化 ---------- */
-const K = {wrong:'dxxg.wrong', stats:'dxxg.stats', sound:'dxxg.sound', grade:'dxxg.grade'};
-function load(k,d){ try{const v=localStorage.getItem(k);return v?JSON.parse(v):d;}catch(e){return d;} }
-function save(k,v){ try{localStorage.setItem(k,JSON.stringify(v));}catch(e){} }
+const PROFILE_ACTIVE_KEY='dxxg.activeProfile.v1';
+const PROFILE_OWNER_KEY='dxxg.deviceOwner.v1';
+const PROFILE_NAMES={dabao:'大宝',xiaobao:'小宝'};
+const LEGACY_KEYS=['dxxg.wrong','dxxg.stats','dxxg.sound','dxxg.grade',
+  'dxxg.session','dxxg.run','dxxg.materials.v1','dxxg.review.v1','dxxg.review.device'];
+const LEGACY_CLAIM_KEY='dxxg.legacyOwner.v1';
+function legacyEntries(){
+  return LEGACY_KEYS.map(key=>[key,localStorage.getItem(key)]).filter(([,value])=>value!==null);
+}
+function downloadLegacyBackup(id,entries){
+  const data={schemaVersion:1,profileId:id,exportedAt:new Date().toISOString(),
+    description:'上线前旧学习记录备份；不含 API Key。',storage:Object.fromEntries(entries)};
+  const url=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}));
+  const a=document.createElement('a');a.href=url;
+  a.download='英语默写旧记录备份-'+PROFILE_NAMES[id]+'-'+today()+'.json';
+  document.body.appendChild(a);a.click();a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),30000);
+}
+function migrateLegacy(id,entries){
+  const written=[];
+  try{
+    if(entries.some(([key])=>localStorage.getItem(key+'.'+id)!==null))
+      throw Error('此通道已有记录，请先导出当前档案');
+    for(const [key,value] of entries){
+      const target=key+'.'+id;
+      localStorage.setItem(target,value);written.push(target);
+    }
+    localStorage.setItem(LEGACY_CLAIM_KEY,id);
+    return true;
+  }catch(e){
+    for(const key of written) localStorage.removeItem(key);
+    toast(e.message||'空间不足，旧记录未迁入');
+    return false;
+  }
+}
+const Profile=(()=>{
+  try{const id=sessionStorage.getItem(PROFILE_ACTIVE_KEY);return PROFILE_NAMES[id]?id:'';}catch(e){return '';}
+})();
+const profileKey=key=>Profile?key+'.'+Profile:null;
+const K = {wrong:profileKey('dxxg.wrong'), stats:profileKey('dxxg.stats'),
+  sound:profileKey('dxxg.sound'), grade:profileKey('dxxg.grade')};
+function load(k,d){ if(!k)return d;try{const v=localStorage.getItem(k);return v?JSON.parse(v):d;}catch(e){return d;} }
+function save(k,v){ if(!k)return;try{localStorage.setItem(k,JSON.stringify(v));}catch(e){} }
 
 const Store = {
   wrong: load(K.wrong,[]),
@@ -429,6 +495,72 @@ const Store = {
   sound: load(K.sound,true),
   grade: load(K.grade,3),
 };
+const SETTINGS_KEY=profileKey('dxxg.settings.v1');
+const SETTINGS_DEFAULT={wordSeconds:20,longWordSeconds:25,sentenceSeconds:35,choiceRepeats:2,choicePause:3,reviewDailyCap:10,fontSize:'normal'};
+const Settings={...SETTINGS_DEFAULT,...load(SETTINGS_KEY,{})};
+function settingNumber(key,value,min,max){
+  const n=Number(value);
+  return Number.isFinite(n)?Math.max(min,Math.min(max,Math.round(n))):SETTINGS_DEFAULT[key];
+}
+function applyFontSize(){ document.body.dataset.fontSize=['normal','large','extra'].includes(Settings.fontSize)?Settings.fontSize:'normal'; }
+applyFontSize();
+const CLOUD_ENV='kaka888-d5ghfuff1958de22c';
+const CLOUD_KEY=profileKey('dxxg.cloud.v1');
+const Cloud={...load(CLOUD_KEY,{paired:false,profileId:'',lastSync:0}),app:null,busy:false,pending:false,timer:null,error:''};
+async function cloudApp(){
+  if(Cloud.app) return Cloud.app;
+  const url=new URL('cloudbase-sdk.js',location.href);
+  url.search=location.search; // 局域网服务的同一访问令牌也用于读取 SDK 文件。
+  const sdk=await import(url.href);
+  Cloud.app=(sdk.default||sdk).init({env:CLOUD_ENV});
+  return Cloud.app;
+}
+async function cloudCall(action,data={}){
+  const app=await cloudApp(), auth=app.auth();
+  if(!auth.hasLoginState()) await auth.signInAnonymously();
+  const response=await app.callFunction({name:action==='bind'?'moxiePair':'moxie',data:{action,...data}});
+  const result=response.result;
+  if(result?.success===true) return result.data;
+  throw Error(result?.error?.message||'云端连接失败');
+}
+function cloudSaveState(){ save(CLOUD_KEY,{paired:Cloud.paired,profileId:Cloud.profileId,lastSync:Cloud.lastSync}); }
+function cloudArchive(){
+  return {schemaVersion:2,deviceId:REVIEW_DEVICE_ID,materials:materialList(),
+    sessions:Review.sessions,plan:reviewProgress()};
+}
+function queueCloudSync(){
+  if(!Cloud.paired) return;
+  Cloud.pending=true;
+  clearTimeout(Cloud.timer);
+  Cloud.timer=setTimeout(()=>{void cloudSync()},1000);
+}
+async function cloudSync(){
+  if(!Cloud.paired||Cloud.busy||!Cloud.pending||!navigator.onLine) return;
+  Cloud.busy=true; Cloud.pending=false;
+  try{
+    const result=await cloudCall('sync',{profileId:Profile,archive:cloudArchive()});
+    Cloud.lastSync=result.updatedAt||Date.now(); Cloud.error=''; cloudSaveState();
+    if(Cloud.pending) queueCloudSync();
+  }catch(e){Cloud.pending=true;Cloud.error=e?.message||'同步失败';}
+  finally{Cloud.busy=false;cloudPaintStatus();}
+}
+async function cloudBind(code){
+  const result=await cloudCall('bind',{code,deviceId:REVIEW_DEVICE_ID,profileId:Profile});
+  if(result.profileId!==Profile) throw Error('配对码属于另一位孩子');
+  const app=await cloudApp();
+  await app.auth().signInWithCustomTicket(()=>Promise.resolve(result.ticket));
+  Cloud.paired=true; Cloud.profileId=result.profileId; Cloud.error=''; cloudSaveState();
+  queueCloudSync();
+}
+function cloudPaintStatus(){
+  const el=$('#cloudStatus'); if(!el) return;
+  el.textContent=Cloud.error?'同步未完成：'+Cloud.error:Cloud.paired
+    ?(Cloud.lastSync?'已同步 · '+new Date(Cloud.lastSync).toLocaleString('zh-CN'):'已配对，等待首次同步')
+    :'未连接云端';
+}
+window.addEventListener('online',()=>{if(Cloud.paired){Cloud.pending=true;void cloudSync();}});
+document.addEventListener('visibilitychange',()=>{if(!document.hidden&&Cloud.paired){Cloud.pending=true;void cloudSync();}});
+setInterval(()=>{if(Cloud.pending)void cloudSync()},30000);
 
 /* ---------- 全局状态 ---------- */
 const S = {
@@ -438,6 +570,7 @@ const S = {
   done: {},    // levelId -> stars
   writeMode: 'hand',   // hand | type
   lastWrong: [],
+  materialId:'', source:'teacher', title:'', notes:[],
 };
 
 /* ---------- 词库 / 干扰项 ---------- */
@@ -492,10 +625,10 @@ function stopSpeak(){
       旧语音继续念、新语音排到它后面 —— 表现就是「题目已经换了，念的还是上一题」。
    ② 带序号：让这一拍期间如果又来了新请求，旧的就彻底放弃，绝不补念。
    ③ 超时兜底：iOS 上 onend 偶尔不触发。 */
-function speakWait(text, rate, lang='en-US'){
+function speakWait(text, rate, lang='en-US', force=false){
   const mySeq = ++speakSeq;
   return new Promise(resolve=>{
-    if(AUTOMATION || !Store.sound || !text || !('speechSynthesis' in window)) return resolve();
+    if(AUTOMATION || (!Store.sound && !force) || !text || !('speechSynthesis' in window)) return resolve();
     let done=false;
     const fin=()=>{ if(done) return; done=true; resolve(); };
     const t = String(text);
@@ -569,7 +702,7 @@ function combo(n){
 
 /* ---------- 弹窗 ---------- */
 function closeModal(){ const m=$('#modal'); if(m) m.remove(); }
-function showModal(title, body, buttons){
+function showModal(title, body, buttons, requireChoice=false){
   closeModal();
   const w=document.createElement('div');
   w.id='modal';
@@ -584,7 +717,7 @@ function showModal(title, body, buttons){
     el.onclick=()=>{ closeModal(); if(b.fn) b.fn(); };
     row.appendChild(el);
   });
-  w.onclick = e=>{ if(e.target===w) closeModal(); };
+  w.onclick = e=>{ if(e.target===w&&!requireChoice) closeModal(); };
 }
 
 /* =========================================================
@@ -792,44 +925,12 @@ function setApiCfg(base, key){
 }
 function clearApiCfg(){ try{ localStorage.removeItem(KAPI); }catch(e){} AI_STATE='unknown'; AI_LAST_ERROR=''; }
 
-const OCR_PROMPT = `你是英语教材内容提取助手。从这张课本照片里挑出**值得孩子默写的学习内容**，输出严格 JSON。
-
-【要的，只有两类】
-1. words：生词表/词汇栏里的英文单词或固定词组 + 它的中文意思。
-   例：apple 苹果 ／ want to do sth 想要做某事 ／ look after 照顾
-2. sentences：完整英文句子、课堂要求会写的短句或口语表达 + 中文翻译。
-   一段连续的短文要按句号/问号/感叹号**拆成多条，一句一条**，不要整段塞成一条。
-   例：She goes to school by bus. 她坐公交车上学。／Not exactly. 不完全是。／Excellent! 太棒了！
-
-【老师的知识梳理页】
-- 先按版面定位 A「核心词句（四会）」起点与下一个 B 标题。只提取两者之间的词句，B 标题以下一个都不能进默写清单。
-- 若清楚标着 A/B/C，每条词句都必须有 section:"A"；若你在 B/C 读到内容，不要输出。has_a_section 设为 true。
-- 整张图从顶到底按 0～1000 标出纵向位置：b_start_y 是 B 标题的上缘；每条词句的 y 是它在图中的纵向中心。即使误把 B 的词标成 A，位置也必须按图片填写。
-- A 中一词、两词的短句也要保留，不能以词数删掉。原样保留大小写、空格、连字符和标点。
-- 若看不到这样的分区，按普通课本页处理，has_a_section 设为 false，b_start_y 设为 null。
-
-【不要的，一律忽略，不要出现在结果里】
-- 单元名、课文标题、栏目名、页码、题号（Unit 4 / My Day / P.27 / 一、二、三 / 1. 2.）
-- 中文题目要求（如「读一读，写出下列单词的中文意思」「根据短文内容回答问题」）
-- 中文说明、语法讲解、注释、旁注、页眉页脚
-- 单独的字母、数字、日期、分值、音标
-- 出版社信息、广告、条形码文字
-- 看不清或残缺的内容
-
-【判断标准】
-- 一条内容如果孩子**不需要会写它**，就不要放进来。
-- 宁可少给，也不要凑数。拿不准的一律不要。
-- 同一页里重复出现的只留一次。
-
-【输出前必须自查拼写 ← 很重要】
-把 words 和 sentences 里的英文**逐个字母核对一遍**：
-- 有拼错的（长单词尤其容易看错，如 traditional / beautiful / delicious），
-  直接把结果里改成**正确拼法**，并把改动记进 fixed 数组。
-- 中文意思写错或不够准的，一并改掉，同样记进 fixed（from 写错的，to 写对的）。
-- 拼写有疑问又拿不准的，宁可不放这一条。
-
-【输出】只输出 JSON，不要解释，不要 markdown 代码块：
-{"unit":"5A Unit 2","has_a_section":true,"b_start_y":650,"words":[{"en":"apple","zh":"苹果","section":"A","y":210}],"sentences":[{"en":"I like apples.","zh":"我喜欢苹果。","section":"A","y":350}],"fixed":[{"from":"traditonal","to":"traditional"}],"ignored":"一句话说明你忽略了哪些东西"}`;
+const OCR_PROMPT = `你是英语知识梳理的逐项抄录员。按照片版面从上到下，提取全部 A/B/C 学习内容，只输出严格 JSON。
+标题中的年级与 Unit 放 unit 字段。A「核心词句（四会）」的词、词组、短句和完整句子都要提取；尤其逐行检查 A 区的「句」表，不能只读上方单词。B「其他词汇」也要逐项提取。C「句型与语法」整理为 notes，每条保留中文要点和示例。三部分都入库，只有 A 后续用于默写。
+words 数组放词或词组；sentences 数组放完整句或课堂口语短句，包括 Excellent!、Slow down.、Not exactly.；notes 数组放语法要点。每条必须有 section:"A"/"B"/"C"。若原图没有 A/B/C 标题，普通材料默认 section:"B"，供用户核对后改层级。
+英文和对应中文照原文逐条配对，不合并相邻条目，保留大小写、连字符、标点。排除题号、页码、姓名栏、标题、照片外内容和看不清的条目。不要把 C 区示例句重复收入 A。输出前特别自查 A 句子数量及长单词拼写。无法确认的写进 ignored，不要猜造。
+只输出 JSON，不要 markdown：{"unit":"5A Unit 2","has_a_section":true,"words":[{"en":"traditional","zh":"传统的","section":"A"},{"en":"sandbag","zh":"沙包","section":"B"}],"sentences":[{"en":"Not exactly.","zh":"不完全是。","section":"A"}],"notes":[{"text":"祈使句：动词原形开头；否定式 Don't + 动词原形。","section":"C"}],"fixed":[],"ignored":""}`;
+const OCR_SENT_PROMPT=`只看图片中 A「核心词句（四会）」区里的「句」栏，逐行抄录英文短句和右侧中文。不要读 B/C，也不要把词汇栏内容当句子。短句如 Excellent!、Slow down.、Not exactly. 都要保留。看不清就不要猜。只输出 JSON：{"sentences":[{"en":"Not exactly.","zh":"不完全是。","section":"A"}]}`;
 
 const INSTRUCTION_WORDS = new Set(('read write listen say look match choose fill answer complete tick circle '+
   'underline translate repeat practise practice total score name class grade date page unit lesson part '+
@@ -908,7 +1009,7 @@ async function vlmDirect(cfg, blob, prompt=OCR_PROMPT){
         { type:'image_url', image_url:{ url:'data:'+(blob.type||'image/jpeg')+';base64,'+b64 } },
         { type:'text', text: prompt }
       ]}],
-      temperature: 0.05, max_tokens: 3000
+      temperature: 0.05, max_tokens: prompt===OCR_PROMPT?6000:1500
     })
   });
   if(!r.ok){
@@ -925,29 +1026,28 @@ async function vlmDirect(cfg, blob, prompt=OCR_PROMPT){
   return data;
 }
 
-// ponytail: 用模型给出的 A/B 分区和纵向位置双重筛选；位置拿不准就留给核对页手动补齐。
-function ocrInScope(items, data){
-  if(data.has_a_section!==true) return items;
-  const edge=Number(data.b_start_y), hasEdge=Number.isFinite(edge)&&edge>0&&edge<1000;
-  return items.filter(x=>String(x.section||'').trim().toUpperCase()==='A' &&
-    (!hasEdge || (x.y!=null && String(x.y).trim()!=='' &&
-      Number.isFinite(Number(x.y)) && Number(x.y)<edge)));
-}
+function ocrTier(section){ return ['A','B','C'].includes(String(section||'').toUpperCase())?String(section).toUpperCase():'B'; }
 
 async function aiOcr(files, onProgress){
   const direct = getApiCfg();
-  const acc = {words:[], sentences:[], model:''};
+  const acc = {words:[], sentences:[], notes:[], model:''};
   const total = files.length;
   for(let i=0;i<total;i++){
     onProgress({_stage:'shrink', _file:i+1, _total:total});
-    const blob = await shrink(files[i], direct?1600:1800, direct?0.82:0.86);
+    const blob = await shrink(files[i], 2300, 0.9);
     if(!blob) throw new Error('图片处理失败');
     onProgress({_stage:'upload', _file:i+1, _total:total});
     let j = null;
     if(direct){
       const data = await vlmDirect(direct, blob);
-      j = { ok:true, model: direct.model || 'qwen3-vl-plus',
-            words: ocrInScope(data.words || [],data), sentences: ocrInScope(data.sentences || [],data),
+      if(data.has_a_section===true && !(data.sentences||[]).some(s=>ocrTier(s.section)==='A')){
+        try{
+          const focused=await vlmDirect(direct,blob,OCR_SENT_PROMPT);
+          data.sentences=[...(data.sentences||[]),...(focused.sentences||[]).map(s=>({...s,section:'A'}))];
+        }catch(e){ /* 主识别结果仍可供核对 */ }
+      }
+      j = { ok:true, schemaVersion:2, model: direct.model || 'qwen3-vl-plus',
+            words:data.words||[], sentences:data.sentences||[], notes:data.notes||[],
             fixed: data.fixed || [], ignored: data.ignored || '', unit:data.unit || '' };
     }else{
       const r = await fetch('api/ocr', {
@@ -958,8 +1058,10 @@ async function aiOcr(files, onProgress){
       try{ j = await r.json(); }catch(e){ throw new Error('电脑端 AI 服务没有响应（HTTP '+r.status+'）'); }
       if(!j.ok) throw new Error(j.message || j.error || 'AI 识别失败');
     }
-    acc.words = acc.words.concat((j.words||[]).map(w=>({en:fixEnglishApostrophes(w.en), zh:w.zh||'', kind:'word'})));
-    acc.sentences = acc.sentences.concat((j.sentences||[]).map(s=>({en:fixEnglishApostrophes(s.en), zh:s.zh||'', kind:'sent'})));
+    const defaultTier=j.schemaVersion===2?'B':pendingSource==='teacher'?'A':'B';
+    acc.words = acc.words.concat((j.words||[]).map(w=>({en:fixEnglishApostrophes(w.en), zh:w.zh||'', kind:'word',tier:ocrTier(w.section||defaultTier)})));
+    acc.sentences = acc.sentences.concat((j.sentences||[]).map(s=>({en:fixEnglishApostrophes(s.en), zh:s.zh||'', kind:'sent',tier:ocrTier(s.section||defaultTier)})));
+    acc.notes = acc.notes.concat((j.notes||[]).map(n=>String(n.text||'').trim()).filter(Boolean));
     acc.model = j.model || acc.model;
     acc.unit = acc.unit || String(j.unit||'').trim();
     acc.ms = (acc.ms||0) + (j.ms||0);
@@ -981,13 +1083,13 @@ async function aiOcr(files, onProgress){
 
   // 一段里塞了好几句的，先切开（否则句子排序会一次甩出十几个词）
   const sSplit = [];
-  for(const s of sRaw) sSplit.push(...splitMultiSentences(s.en, s.zh));
+  for(const s of sRaw) sSplit.push(...splitMultiSentences(s.en, s.zh).map(x=>({...x,tier:s.tier})));
 
   // 去重（跨表也算重复）
   const seen=new Set(), W=[], Ss=[];
   for(const w of wRaw){ const k=norm(w.en); if(k && !seen.has(k)){ seen.add(k); W.push({...w, kind:'word'}); } }
   for(const s of sSplit){ const k=norm(s.en); if(k && !seen.has(k)){ seen.add(k); Ss.push({...s, zh: cleanZh(s.zh), kind:'sent'}); } }
-  acc.words=W; acc.sentences=Ss;
+  acc.words=W; acc.sentences=Ss; acc.notes=uniq(acc.notes);
   return acc;
 }
 
@@ -1010,24 +1112,28 @@ async function ocrImages(files, onProgress){
 /* =========================================================
    路由
    ========================================================= */
-const TITLES = {home:'英语默写小闯关', review:'核对一下内容', levels:'选择关卡',
+const TITLES = {profile:'选择孩子',home:'英语默写小闯关', settings:'设置', review:'核对一下内容', levels:'选择关卡',
   play:'闯关中', result:'本关成绩', wrong:'错词本', stats:'成绩记录', crop:'裁一下，只留要的',
   dictation:'课堂默写', dictPlay:'课堂默写', dictResult:'默写结果', plan:'复习计划'};
 /* 每一页的「上一页」是谁 —— 保证任何页面都退得回去 */
-const PARENT = {home:null, review:'home', levels:'review', play:'levels', result:'levels', wrong:null, stats:null, crop:'home',
+const PARENT = {profile:null,home:null, settings:'home', review:'home', levels:'review', play:'levels', result:'levels', wrong:null, stats:null, crop:'home',
   dictation:'home', dictPlay:'dictation', dictResult:'dictation', plan:'home'};
 let route='home';
 let backTo='home';              // 打开错词本/成绩之前在哪一页
 function go(r){
+  if(!Profile&&r!=='profile') r='profile';
   if((r==='wrong'||r==='stats') && route!=='wrong' && route!=='stats') backTo = route;
   route=r;
-  $('#barTitle').textContent = TITLES[r]||'英语默写小闯关';
-  const bb=$('#btnBack'); if(bb) bb.classList.toggle('hide', r==='home');
-  const bh=$('#btnHome'); if(bh) bh.classList.toggle('hide', r==='home');
-  $('#btnSound').classList.toggle('hide', ['dictation','dictPlay','dictResult'].includes(r));
+  $('#barTitle').textContent = (Profile?PROFILE_NAMES[Profile]+' · ':'')+(TITLES[r]||'英语默写小闯关');
+  const bb=$('#btnBack'); if(bb) bb.classList.toggle('hide', r==='home'||r==='profile');
+  const bh=$('#btnHome'); if(bh) bh.classList.toggle('hide', r==='home'||r==='profile');
+  $('#btnSound').classList.toggle('hide', r==='profile'||['dictation','dictPlay','dictResult'].includes(r));
+  $('#btnSettings').classList.toggle('hide',r!=='home');
+  $('#btnWrong').classList.toggle('hide',r==='profile');
+  $('#btnStats').classList.toggle('hide',r==='profile');
   window.scrollTo(0,0);
   if(r==='play') return;
-  const fn = {home:renderHome, review:renderReview, levels:renderLevels,
+  const fn = {profile:renderProfileGate,home:renderHome, settings:renderSettings, review:renderReview, levels:renderLevels,
               result:renderResult, wrong:renderWrong, stats:renderStats,
               crop:renderCropStep, dictation:renderDictationSetup, plan:renderPlan,
               dictPlay:renderDictationQuestion, dictResult:renderDictationResult}[r] || renderHome;
@@ -1046,16 +1152,115 @@ function goBack(){
 /* =========================================================
    首页
    ========================================================= */
+function renderProfileGate(){
+  const savedOwner=localStorage.getItem(PROFILE_OWNER_KEY)||'';
+  let owner=savedOwner;
+  try{owner=JSON.parse(savedOwner)||savedOwner;}catch{}
+  if(!PROFILE_NAMES[owner]) owner='';
+  $('#wrap').innerHTML=`<div class="screen profile-screen">
+    <h1 style="text-align:center;margin-bottom:24px">谁来学习？</h1>
+    <div class="profile-grid">${Object.entries(PROFILE_NAMES).map(([id,name])=>`<button class="profile-card ${owner===id?'current':''}" type="button" data-profile="${id}"><span>${name}</span>${owner===id?'<small>这台 iPad</small>':''}</button>`).join('')}</div>
+  </div>`;
+  $$('[data-profile]').forEach(button=>button.onclick=()=>{
+    const id=button.dataset.profile;
+    const enter=()=>{
+      try{localStorage.setItem(PROFILE_OWNER_KEY,id);sessionStorage.setItem(PROFILE_ACTIVE_KEY,id);location.reload();}
+      catch(e){toast('无法保存孩子通道，请检查浏览器存储');}
+    };
+    if(owner&&owner!==id){
+      showModal('切换这台 iPad？','目前归属 <b>'+PROFILE_NAMES[owner]+'</b>。切换后会显示 '+PROFILE_NAMES[id]+' 的独立资料和记录。',[
+        {t:'取消',primary:true},{t:'家长确认切换',fn:enter}
+      ],true);
+    }else if(!owner&&!localStorage.getItem(LEGACY_CLAIM_KEY)&&legacyEntries().length){
+      const entries=legacyEntries();
+      showModal('保存旧记录','这台 iPad 的旧学习记录将归入 <b>'+PROFILE_NAMES[id]+'</b>。先下载备份，再确认归属。',[
+        {t:'返回'},
+        {t:'下载旧记录备份',primary:true,fn:()=>{
+          try{downloadLegacyBackup(id,entries);}catch{toast('备份下载失败，请重试');return;}
+          showModal('确认记录归属','请确认备份已保存在“文件”中，并确认这是 <b>'+PROFILE_NAMES[id]+'</b> 的 iPad。',[
+            {t:'返回'},
+            {t:'确认归属并继续',primary:true,fn:()=>{if(migrateLegacy(id,entries)) enter();}}
+          ],true);
+        }}
+      ],true);
+    }else enter();
+  });
+}
+function renderSettings(){
+  $('#wrap').innerHTML=`<div class="screen"><div class="card">
+    <form id="settingsForm">
+      <h2>课堂默写</h2>
+      <div class="settings-grid">
+        <label>普通单词（秒）<input name="wordSeconds" type="number" min="5" max="120" value="${Settings.wordSeconds}"></label>
+        <label>4 音节以上（秒）<input name="longWordSeconds" type="number" min="5" max="120" value="${Settings.longWordSeconds}"></label>
+        <label>句子（秒）<input name="sentenceSeconds" type="number" min="5" max="180" value="${Settings.sentenceSeconds}"></label>
+      </div>
+      <h2 style="margin-top:24px">答对之后</h2>
+      <div class="settings-grid">
+        <label>英文朗读次数<input name="choiceRepeats" type="number" min="1" max="3" value="${Settings.choiceRepeats}"></label>
+        <label>停留（秒）<input name="choicePause" type="number" min="1" max="10" value="${Settings.choicePause}"></label>
+      </div>
+      <h2 style="margin-top:24px">显示与复习</h2>
+      <div class="settings-grid">
+        <label>每天最多复习<input name="reviewDailyCap" type="number" min="1" max="50" value="${Settings.reviewDailyCap}"></label>
+        <label>字体大小<select name="fontSize"><option value="normal">标准</option><option value="large">大</option><option value="extra">特大</option></select></label>
+        <label>闯关难度<select name="grade"><option value="3">基础</option><option value="5">进阶</option></select></label>
+      </div>
+      <button class="btn primary" style="margin-top:24px" type="submit">保存设置</button>
+    </form>
+    <div style="border-top:1px solid var(--line);margin-top:26px;padding-top:18px">
+      <h2>云端记录</h2><p class="sub" id="cloudStatus"></p>
+      <p class="sub">在 WordKid 家长端的“默写记录”生成配对码，只需连接一次。</p>
+      <div class="row"><input id="cloudCode" class="dict-input" inputmode="numeric" autocomplete="one-time-code" maxlength="12" placeholder="12 位配对码" aria-label="默写配对码">
+      <button class="btn sm ghost" id="cloudPair" type="button">连接</button></div>
+    </div>
+  </div></div>`;
+  const form=$('#settingsForm'); form.elements.fontSize.value=Settings.fontSize; form.elements.grade.value=String(Store.grade);
+  form.onsubmit=e=>{
+    e.preventDefault();
+    for(const [key,min,max] of [['wordSeconds',5,120],['longWordSeconds',5,120],['sentenceSeconds',5,180],['choiceRepeats',1,3],['choicePause',1,10],['reviewDailyCap',1,50]])
+      Settings[key]=settingNumber(key,form.elements[key].value,min,max);
+    Settings.fontSize=['normal','large','extra'].includes(form.elements.fontSize.value)?form.elements.fontSize.value:'normal';
+    Store.grade=+form.elements.grade.value===5?5:3; save(K.grade,Store.grade);
+    save(SETTINGS_KEY,Settings); applyFontSize(); go('home'); toast('设置已保存');
+  };
+  cloudPaintStatus();
+  $('#cloudPair').onclick=async()=>{
+    const code=$('#cloudCode').value.trim(), button=$('#cloudPair');
+    if(!/^\d{12}$/.test(code)){toast('请输入 12 位配对码');return;}
+    button.disabled=true; button.textContent='连接中…';
+    try{await cloudBind(code); toast('已连接，学习记录将自动同步');}
+    catch(e){Cloud.error=e?.message||'连接失败';toast(Cloud.error,3500);}
+    finally{button.disabled=false;button.textContent='连接';cloudPaintStatus();}
+  };
+}
+function libraryHtml(){
+  const rows=materialList().sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0));
+  if(!rows.length) return '';
+  return `<div class="card"><h2>资料库 · ${rows.length} 份</h2>${Object.entries(SOURCE_NAMES).map(([source,name])=>{
+    const group=rows.filter(x=>x.source===source);
+    if(!group.length) return '';
+    return `<details class="plan-unit" ${source==='teacher'?'open':''}><summary>${name} · ${group.length}</summary>${group.map(x=>{
+      const items=[...(x.words||[]),...(x.sents||[])];
+      const count=tier=>items.filter(y=>(y.tier||'A')===tier).length+(tier==='C'?(x.notes||[]).length:0);
+      return `<div class="material-row"><div><b>${esc(x.unit||'未分 Unit')}${x.title?' · '+esc(x.title):''}</b><p class="sub">A ${count('A')} · B ${count('B')} · C ${count('C')}</p></div><div class="row"><button class="btn sm ghost" data-material="${esc(x.id)}">打开</button><button class="btn sm ghost" data-remove-material="${esc(x.id)}" aria-label="移除${esc(x.unit||x.title||'这份资料')}">移除</button></div></div>`;
+    }).join('')}</details>`;
+  }).join('')}</div>`;
+}
 function renderHome(){
   const hasW=S.words.length, hasS=S.sents.length;
+  const hasDict=[...S.words,...S.sents].some(x=>x.on&&x.tier==='A');
   $('#wrap').innerHTML = `
   <div class="screen">
+    <button class="btn sm ghost" id="btnProfileChange" style="width:auto;margin:0 0 12px">${PROFILE_NAMES[Profile]} ⌄</button>
     ${reviewHomeCard()}
     <div class="dict-steps"><span class="on">① 准备词句</span><span>② 闯关练习</span><span>③ 课堂默写</span></div>
     <div class="card">
       <div class="aibadge wait" id="aiBadge">正在检查识别引擎…</div>
-      <h1>① 拍老师的知识梳理</h1>
-      <p class="sub">识别后核对并选出 A 类“四会”词句。</p>
+      <h1>拍知识梳理</h1>
+      <p class="sub">A 类用于默写，B/C 也保存在资料库。</p>
+      <label class="sub" for="sourceType">资料来源</label>
+      <select id="sourceType" class="tier-select" style="display:block;margin:8px 0 14px;min-height:44px">${Object.entries(SOURCE_NAMES).map(([k,v])=>`<option value="${k}">${v}</option>`).join('')}</select>
       <div class="drop" id="dropZone" role="button" tabindex="0" aria-label="拖入图片，或按回车从本地选图">
         <div class="big">📷</div>
         <div class="t">拖图片到这里，或点此选图</div>
@@ -1074,6 +1279,8 @@ function renderHome(){
       </div>
     </div>
 
+    ${libraryHtml()}
+
     <div class="card">
       <h2>也可以粘贴文字</h2>
       <textarea id="rawText" placeholder="apple 苹果&#10;banana 香蕉&#10;I like apples. 我喜欢苹果。&#10;She goes to school by bus. 她坐公交车上学。"></textarea>
@@ -1082,23 +1289,15 @@ function renderHome(){
       </div>
     </div>
 
-    <div class="card">
-      <h2>选择年级</h2>
-      <div class="chips" id="gradeChips">
-        <button class="chip" data-g="3">三年级（题目简单些）</button>
-        <button class="chip" data-g="5">五年级（题目难一些）</button>
-      </div>
-    </div>
-
     ${(hasW||hasS)?`<div class="card">
-      <h2>② 闯关练习</h2>
+      <h2>闯关练习</h2>
       <p class="sub">已准备 ${hasW} 个词、${hasS} 个句子。</p>
       <button class="btn green" id="btnContinue">去练习</button>
     </div>`:''}
     <div class="card dict-entry">
-      <h2>③ 课堂默写</h2>
+      <h2>课堂默写</h2>
       <p class="sub">中文报题，用手指或笔写英文，由系统核对。</p>
-      <button class="btn primary" id="btnDictationHome">${hasW||hasS?'用本课内容默写':'用示例试玩'}</button>
+      <button class="btn primary" id="btnDictationHome">${hasDict?'用本课 A 类默写':'用示例试玩'}</button>
     </div>
     <div class="card" style="padding:14px">
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
@@ -1109,9 +1308,23 @@ function renderHome(){
   </div>`;
 
   const pick = (inp)=>{ inp.value=''; inp.click(); };
+  $('#btnProfileChange').onclick=()=>go('profile');
   if($('#btnPlanHome')) $('#btnPlanHome').onclick=()=>go('plan');
   if($('#btnDueHome')) $('#btnDueHome').onclick=startReviewToday;
-  $('#btnDictationHome').onclick = ()=>{ Dict.from='home'; Dict.source=hasW||hasS?'current':'sample'; go('dictation'); };
+  $('#btnDictationHome').onclick = ()=>{ Dict.from='home'; Dict.source=hasDict?'current':'sample'; go('dictation'); };
+  $$('[data-material]').forEach(b=>b.onclick=()=>{
+    const row=materialList().find(x=>x.id===b.dataset.material);
+    if(!row) return;
+    clearRun(); loadMaterial(row); saveSession(); go('review');
+  });
+  $$('[data-remove-material]').forEach(b=>b.onclick=()=>{
+    const row=materialList().find(x=>x.id===b.dataset.removeMaterial);
+    if(!row) return;
+    showModal('移除这份资料？','<b>'+esc(row.unit||row.title||'未命名资料')+'</b><br>学习记录会保留。',[
+      {t:'取消',primary:true},
+      {t:'移除',danger:true,fn:()=>removeMaterial(row.id)}
+    ]);
+  });
   const dropZone=$('#dropZone');
   const hasDraggedFiles=e=>Array.from(e.dataTransfer?.types||[]).includes('Files');
   let dragDepth=0;
@@ -1143,10 +1356,6 @@ function renderHome(){
     applyParse(t, true);
   };
   if($('#btnContinue')) $('#btnContinue').onclick = ()=>{ go('levels'); };
-  $$('#gradeChips .chip').forEach(c=>{
-    if(+c.dataset.g===Store.grade) c.classList.add('on');
-    c.onclick = ()=>{ Store.grade=+c.dataset.g; save(K.grade,Store.grade); renderHome(); };
-  });
   if($('#btnReload')) $('#btnReload').onclick = ()=>{
     toast('正在获取最新版…', 1200);
     // 加时间戳绕开缓存（Safari 对网页会缓存最多 10 分钟）
@@ -1233,6 +1442,7 @@ function applyHashConfig(){
    上传前裁切：先把不要的部分框掉，再送去识别
    ========================================================= */
 const Crop = { queue:[], idx:0, out:[], box:{x:0,y:0,w:0,h:0}, url:null };
+let pendingSource='teacher';
 
 function handleFiles(files){
   if(!files || !files.length) return;
@@ -1240,6 +1450,7 @@ function handleFiles(files){
   const images=[...files].filter(f=>f.type.startsWith('image/')||(!f.type&&/\.(png|jpe?g|webp|gif|bmp|heic|heif|avif)$/i.test(f.name)));
   if(!images.length){ toast('请拖入图片文件'); return; }
   if(images.length!==files.length) toast('已跳过非图片文件');
+  pendingSource=$('#sourceType')?.value||'teacher';
   Crop.queue = images;
   Crop.idx = 0;
   Crop.out = [];
@@ -1387,24 +1598,22 @@ async function doRecognize(files){
       if(m._stage==='shrink'){ msg.textContent='正在压缩照片 '+m._file+'/'+m._total+'…'; fill.style.width=(10+m._file/m._total*15)+'%'; }
       else if(m._stage==='upload'){ msg.textContent='AI 正在读图 '+m._file+'/'+m._total+'…（约 5-10 秒）'; fill.style.width=(30+m._file/m._total*60)+'%'; }
     });
-    if(!r.words.length && !r.sentences.length) throw new Error('图片里没读出英文内容');
-    S.words = r.words.map(w=>({...w, on:true}));
-    S.sents = r.sentences.map(s=>({...s, on:true, key:pickKey(s.en)}));
-    S.unit = String(r.unit||'').trim().slice(0,40);
+    if(!r.words.length && !r.sentences.length && !r.notes.length) throw new Error('图片里没读出学习内容');
+    const candidate={source:pendingSource,title:'',notes:r.notes||[],
+      words:r.words.map(w=>({...w,on:true})),
+      sents:r.sentences.map(s=>({...s,on:true,key:pickKey(s.en)})),
+      unit:String(r.unit||'').trim().slice(0,40),ignored:r.ignored||'',fixed:r.fixed||[]};
     $('#rawText').value = [
       ...r.words.map(w=>w.en + (w.zh? '  '+w.zh : '')),
       ...r.sentences.map(s=>s.en + (s.zh? '  '+s.zh : ''))
     ].join('\n');
     fill.style.width='100%';
+    const aSentences=r.sentences.filter(x=>x.tier==='A').length;
     msg.innerHTML = '✅ AI 识别完成 &nbsp;·&nbsp; 单词 <b>'+r.words.length+'</b> 个，句子 <b>'+r.sentences.length+'</b> 句';
     setTimeout(()=>bar.classList.add('hide'), 900);
-    toast('识别完成');
-    S.done = {};
-    S.ignored = r.ignored || '';
-    S.fixed = r.fixed || [];
+    toast(pendingSource==='teacher'&&!aSentences?'A 类句子未读到，请在核对页补充':'识别完成',3500);
     AI_STATE='ready'; AI_LAST_ERROR='';
-    clearRun(); saveSession();
-    go('review');
+    importMaterial(candidate);
     return;
   }catch(err){
     AI_STATE = 'degraded';
@@ -1478,12 +1687,15 @@ async function runFallback(list){
 function applyParse(text, preview){
   const r = parseBlocks(text);
   if(!r.words.length && !r.sents.length){ toast('没识别出英文内容，检查一下'); return; }
-  S.words = r.words.map(w=>({...w,on:true}));
-  S.sents = r.sents.map(s=>({...s,on:true,key:pickKey(s.en)}));
-  S.unit = (String(text).match(/\b(?:[3-6]A\s*)?Unit\s*\d+\b/i)||[])[0] || (preview?'':S.unit);
-  S.done = {};
-  clearRun(); saveSession();
-  if(preview){ go('review'); }
+  const previous=new Map([...S.words,...S.sents].map(x=>[norm(x.en),x.tier]));
+  const source=preview?($('#sourceType')?.value||'other'):S.source;
+  const fallbackTier=preview?'B':source==='teacher'?'A':'B';
+  const candidate={source,title:preview?'':S.title,notes:preview?[]:S.notes,
+    words:r.words.map(w=>({...w,on:true,tier:preview?fallbackTier:previous.get(norm(w.en))||fallbackTier})),
+    sents:r.sents.map(s=>({...s,on:true,tier:preview?fallbackTier:previous.get(norm(s.en))||fallbackTier,key:pickKey(s.en)})),
+    unit:(String(text).match(/\b(?:[3-6]A\s*)?Unit\s*\d+\b/i)||[])[0] || (preview?'':S.unit)};
+  if(preview) importMaterial(candidate);
+  else {S.words=candidate.words;S.sents=candidate.sents;S.unit=candidate.unit;S.done={};clearRun();saveSession();}
 }
 
 /* =========================================================
@@ -1491,37 +1703,45 @@ function applyParse(text, preview){
    ========================================================= */
 function renderReview(){
   const W=S.words, Ss=S.sents;
+  const sourceOptions=Object.entries(SOURCE_NAMES).map(([k,v])=>`<option value="${k}" ${S.source===k?'selected':''}>${v}</option>`).join('');
   $('#wrap').innerHTML = `
   <div class="screen">
-    <div class="card"><h2>本课 Unit</h2>
+    <div class="card"><h2>资料分类</h2>
+      <div class="settings-grid"><label>来源<select id="materialSource" class="tier-select">${sourceOptions}</select></label>
+      <label>资料名<input id="materialTitle" class="dict-input" maxlength="60" value="${esc(S.title)}" placeholder="例如：第 2 课知识梳理"></label></div>
+      <h2 style="margin-top:18px">Unit</h2>
       <input id="unitName" class="dict-input" style="font-family:inherit" maxlength="40" value="${esc(S.unit||'')}" placeholder="例如 5A Unit 2">
+      <p class="sub">A 默写 · B 认词 · C 熟悉。每条右侧可改层级。</p>
     </div>
-    <div class="card">
-      <h2>📄 识别出来的原文</h2>
-      <p class="sub">哪里不对就直接改这里，改完点「重新拆分」。一行一个词或一句话。</p>
-      <textarea id="rawText2" style="width:100%;min-height:110px;border-radius:14px;border:2px solid var(--line);padding:11px;font-size:14px;line-height:1.7">${esc($('#rawText') ? $('#rawText').value : '')}</textarea>
+    <div class="card"><details id="rawDetails"><summary style="cursor:pointer;font-weight:800">查看识别原文</summary>
+      <p class="sub">改完点“重新拆分”。</p>
+      <textarea id="rawText2" style="width:100%;min-height:110px;border-radius:14px;border:2px solid var(--line);padding:11px;font-size:14px;line-height:1.7">${esc([...W,...Ss].map(x=>x.en+'  '+x.zh).join('\n'))}</textarea>
       <button class="btn sm ghost" id="btnReparse" style="margin-top:10px">🔄 重新拆分</button>
       ${S.ignored?`<p class="sub" style="margin:10px 0 0;color:#B45309">🤖 已自动忽略：${esc(S.ignored)}</p>`:''}
       ${(S.fixed&&S.fixed.length)?`<p class="sub" style="margin:8px 0 0;color:#15803D">✏️ 已自动修正拼写：${
         S.fixed.map(f=>esc(f.from||'')+' → <b>'+esc(f.to||'')+'</b>').join('、')}</p>`:''}
-      <p class="sub" style="margin:10px 0 0;font-size:12.5px">带 <b style="color:#B45309">⚠️</b> 的是自动查出来"看着不太像正常单词"的，麻烦你扫一眼；改完直接点下面的按钮。</p>
-    </div>
+    </details></div>
     <div class="card">
       <h2>📝 单词（${W.filter(w=>w.on).length}/${W.length}）</h2>
-      <p class="sub">英文或中文写错了，直接点上去改。不要的按 ✕。</p>
       <div id="wList">${W.map((w,i)=>wordRow(w,i)).join('') || '<p class="sub">没有单词</p>'}</div>
       <button class="btn sm ghost" id="addW">＋ 加一个单词</button>
     </div>
     <div class="card">
       <h2>💬 句子（${Ss.filter(s=>s.on).length}/${Ss.length}）</h2>
-      <p class="sub">每句下面写着会挖掉哪个词。英文或中文错了，直接点上去改。</p>
+      ${S.source==='teacher'&&!Ss.some(s=>s.tier==='A')?'<p class="sub" style="color:#B45309">这份资料还没有 A 类句子，请对照原图检查。</p>':''}
       <div id="sList">${Ss.map((s,i)=>sentRow(s,i)).join('') || '<p class="sub">没有句子</p>'}</div>
       <button class="btn sm ghost" id="addS">＋ 加一个句子</button>
     </div>
-    <button class="btn amber" id="btnGo">开始闯关 🚀</button>
+    <div class="card"><h2>语法与要点（C 类）</h2>
+      <textarea id="materialNotes" style="width:100%;min-height:100px;border-radius:14px;border:2px solid var(--line);padding:11px;font-size:14px;line-height:1.7" placeholder="一行一条">${esc(S.notes.join('\n'))}</textarea>
+    </div>
+    <button class="btn amber" id="btnGo">${W.length||Ss.length?'开始闯关 🚀':'保存资料'}</button>
   </div>`;
 
   $('#unitName').oninput=()=>{ S.unit=$('#unitName').value.trim().slice(0,40); saveSession(); };
+  $('#materialSource').onchange=()=>{ S.source=$('#materialSource').value; saveSession(); };
+  $('#materialTitle').oninput=()=>{ S.title=$('#materialTitle').value.trim().slice(0,60); saveSession(); };
+  $('#materialNotes').oninput=()=>{ S.notes=$('#materialNotes').value.split('\n').map(x=>x.trim()).filter(Boolean); saveSession(); };
 
   $$('#wList input[type=text]').forEach(inp=>{
     inp.oninput = ()=>{ const i=+inp.dataset.i, f=inp.dataset.f; S.words[i][f]=inp.value.trim(); saveSession(); };
@@ -1529,10 +1749,11 @@ function renderReview(){
   $$('#wList .del').forEach(b=>b.onclick=()=>{ S.words.splice(+b.dataset.i,1); saveSession(); renderReview(); });
   $$('#wList .mv').forEach(b=>b.onclick=()=>{
     const w = S.words.splice(+b.dataset.i,1)[0]; if(!w) return;
-    S.sents.push({en:w.en, zh:w.zh, kind:'sent', on:true, key:pickKey(w.en)});
+    S.sents.push({en:w.en, zh:w.zh, kind:'sent', on:true, tier:w.tier, key:pickKey(w.en)});
     saveSession(); renderReview(); toast('已移到句子区');
   });
   $$('#wList .pick').forEach(c=>c.onchange=()=>{ S.words[+c.dataset.i].on=c.checked; saveSession(); renderReview(); });
+  $$('#wList .tier-select').forEach(c=>c.onchange=()=>{ S.words[+c.dataset.i].tier=c.value; saveSession(); renderReview(); });
 
   $$('#sList input[type=text]').forEach(inp=>{
     inp.oninput = ()=>{ const i=+inp.dataset.i, f=inp.dataset.f; S.sents[i][f]=inp.value.trim();
@@ -1541,13 +1762,14 @@ function renderReview(){
   $$('#sList .del').forEach(b=>b.onclick=()=>{ S.sents.splice(+b.dataset.i,1); saveSession(); renderReview(); });
   $$('#sList .mv').forEach(b=>b.onclick=()=>{
     const s = S.sents.splice(+b.dataset.i,1)[0]; if(!s) return;
-    S.words.push({en:s.en, zh:s.zh, kind:'word', on:true});
+    S.words.push({en:s.en, zh:s.zh, kind:'word', on:true, tier:s.tier});
     saveSession(); renderReview(); toast('已移到单词区');
   });
   $$('#sList .pick').forEach(c=>c.onchange=()=>{ S.sents[+c.dataset.i].on=c.checked; saveSession(); renderReview(); });
+  $$('#sList .tier-select').forEach(c=>c.onchange=()=>{ S.sents[+c.dataset.i].tier=c.value; saveSession(); renderReview(); });
 
-  $('#addW').onclick = ()=>{ S.words.push({en:'new word',zh:'新词',kind:'word',on:true}); saveSession(); renderReview(); };
-  $('#addS').onclick = ()=>{ S.sents.push({en:'I am a new sentence.',zh:'我是一个新句子。',kind:'sent',on:true,key:'sentence'}); saveSession(); renderReview(); };
+  $('#addW').onclick = ()=>{ S.words.push({en:'new word',zh:'新词',kind:'word',on:true,tier:S.source==='teacher'?'A':'B'}); saveSession(); renderReview(); };
+  $('#addS').onclick = ()=>{ S.sents.push({en:'I am a new sentence.',zh:'我是一个新句子。',kind:'sent',on:true,tier:S.source==='teacher'?'A':'B',key:'sentence'}); saveSession(); renderReview(); };
   $('#btnReparse').onclick = ()=>{
     const t = $('#rawText2').value;
     if(!/[A-Za-z]/.test(t)){ toast('还没有英文内容'); return; }
@@ -1557,7 +1779,10 @@ function renderReview(){
     toast('已重新拆分');
   };
   $('#btnGo').onclick = ()=>{
-    if(!S.words.some(w=>w.on) && !S.sents.some(s=>s.on)){ toast('至少要留一个单词或句子'); return; }
+    if(!S.words.some(w=>w.on) && !S.sents.some(s=>s.on)){
+      if(S.notes.length){ saveSession(); go('home'); return; }
+      toast('至少要留一个词、句子或语法要点'); return;
+    }
     S.done={}; clearRun(); saveSession(); go('levels');
   };
 }
@@ -1575,6 +1800,7 @@ function wordRow(w,i){
     <input type="checkbox" class="pick" data-i="${i}" ${w.on?'checked':''} style="width:22px;height:22px;accent-color:#2563EB">
     <input type="text" class="en" data-i="${i}" data-f="en" value="${esc(w.en)}">
     <input type="text" class="zh" data-i="${i}" data-f="zh" value="${esc(w.zh)}" placeholder="中文…">
+    <select class="tier-select" data-i="${i}" aria-label="学习层级">${['A','B','C'].map(t=>`<option value="${t}" ${w.tier===t?'selected':''}>${t}</option>`).join('')}</select>
     ${warn?`<span class="tag" title="${esc(warn)}" style="background:#FEE2E2;color:#B91C1C">⚠️</span>`:''}
     <button class="mv" data-i="${i}" title="这其实是句子 → 移到句子区">⇄</button>
     <button class="del" data-i="${i}">✕</button>
@@ -1590,6 +1816,7 @@ function sentRow(s,i){
         style="width:100%;font-size:13.5px;font-weight:600;color:#1D4ED8;padding:4px 2px">
       <div style="font-size:11.5px;color:#94A3B8;margin-top:3px">句子填空会挖掉：<b style="color:#B45309">${esc(s.key||'—')}</b></div>
     </div>
+    <select class="tier-select" data-i="${i}" aria-label="学习层级">${['A','B','C'].map(t=>`<option value="${t}" ${s.tier===t?'selected':''}>${t}</option>`).join('')}</select>
     <button class="mv" data-i="${i}" title="这其实是单词/词组 → 移到单词区">⇄</button>
     <button class="del" data-i="${i}">✕</button>
   </div>`;
@@ -1607,18 +1834,20 @@ const LEVELS = [
   {id:'write',  icon:'🏆', nm:'课堂默写',     ds:'看中文，用手指或笔写英文', kind:'final'},
 ];
 function activeLevels(){
-  const w=S.words.filter(x=>x.on), s=S.sents.filter(x=>x.on);
+  const w=S.words.filter(x=>x.on&&x.tier!=='C'), s=S.sents.filter(x=>x.on&&x.tier!=='C');
+  const aw=w.filter(x=>x.tier==='A'), as=s.filter(x=>x.tier==='A');
   const out=[];
-  if(w.length>=2){ out.push('choose','spell'); if(w.length>=3) out.push('listen'); }
-  else if(w.length===1){ out.push('spell'); }
+  if(w.length){ out.push('choose','listen'); }
+  if(aw.length) out.push('spell');
   if(s.length>=2){ out.push('cloze'); }
   if(orderPool().length>=2){ out.push('order'); }   // 没有 3~9 词的干净句子就不出这一关
-  if(w.length||s.length) out.push('write');
+  if(aw.length||as.length) out.push('write');
   return LEVELS.filter(l=>out.includes(l.id));
 }
 function renderLevels(){
   const lv = activeLevels();
   const wc = S.words.filter(x=>x.on).length, sc = S.sents.filter(x=>x.on).length;
+  const familiar=[...S.words,...S.sents].filter(x=>x.on&&x.tier==='C');
   const mid = (Run.id && Run.qs && Run.qs.length && Run.i < Run.qs.length);
   const midLv = mid ? (LEVELS.find(l=>l.id===Run.id)||{nm:'这一关'}).nm : '';
   $('#wrap').innerHTML = `
@@ -1630,12 +1859,15 @@ function renderLevels(){
     </div>`:''}
     <div class="card">
       <h2>今天要练的内容</h2>
-      <p class="sub">📚 <b>${wc}</b> 个单词 &nbsp;·&nbsp; 💬 <b>${sc}</b> 个句子 &nbsp;·&nbsp; 共 <b>${lv.length}</b> 关</p>
+      <p class="sub">${esc(S.unit||'未分 Unit')} · 📚 ${wc} 词 · 💬 ${sc} 句 · ${lv.length} 关</p>
       <div class="row">
         <button class="btn sm ghost" id="btnEdit">✏️ 改内容</button>
         <button class="btn sm ghost" id="btnNew">📸 换一批</button>
       </div>
     </div>
+    ${(familiar.length||S.notes.length)?`<div class="card"><details><summary style="cursor:pointer;font-weight:800">C 类 · 看一看（${familiar.length+S.notes.length}）</summary>
+      ${familiar.map(x=>`<p class="plan-row"><b>${esc(x.en)}</b><span class="sub">${esc(x.zh)}</span></p>`).join('')}
+      ${S.notes.map(n=>`<p class="plan-row">${esc(n)}</p>`).join('')}</details></div>`:''}
     ${lv.map((l,i)=>{
       const st = S.done[l.id];
       return `<div class="level ${st!=null?'done':''}" data-id="${l.id}">
@@ -1652,7 +1884,7 @@ function renderLevels(){
   $$('.level').forEach(el=>el.onclick=()=>startLevel(el.dataset.id));
   if($('#btnResume')) $('#btnResume').onclick = ()=>{ go('play'); renderQ(); };
   $('#btnEdit').onclick = ()=>go('review');
-  $('#btnNew').onclick  = ()=>{ S.words=[]; S.sents=[]; S.unit=''; S.done={}; clearRun(); saveSession(); go('home'); };
+  $('#btnNew').onclick  = ()=>{ clearActiveMaterial(); go('home'); };
 }
 
 /* =========================================================
@@ -1680,7 +1912,7 @@ function orderOK(en){
   return clean.length >= 3 && clean.length <= 9;          // 3~9 个词最舒服
 }
 function orderPool(){
-  return S.sents.filter(x => x.on && x.en && orderOK(x.en));
+  return S.sents.filter(x => x.on && x.tier==='A' && x.en && orderOK(x.en));
 }
 
 /* 中文释义里常混进「例如：…」这类课本说明，砍掉 */
@@ -1702,8 +1934,9 @@ function distractors(correct, pool, n){
   return pick;
 }
 function buildQuestions(levelId){
-  const W = S.words.filter(x=>x.on && x.en);
-  const Ss= S.sents.filter(x=>x.on && x.en);
+  const W = S.words.filter(x=>x.on && x.en && x.tier!=='C');
+  const Ss= S.sents.filter(x=>x.on && x.en && x.tier!=='C');
+  const AW=W.filter(x=>x.tier==='A'), AS=Ss.filter(x=>x.tier==='A');
   const wPool = W.map(x=>x.en);
   const sPool = Ss.map(x=>x.key).filter(Boolean);
   const hard = Store.grade>=5;
@@ -1715,7 +1948,7 @@ function buildQuestions(levelId){
     });
   }
   if(levelId==='spell'){
-    return take(W, hard?CAP:8).map(w=>({kind:'spell', zh:w.zh||'（没有中文）', answer:w.en, entry:w}));
+    return take(AW, hard?CAP:8).map(w=>({kind:'spell', zh:w.zh||'（没有中文）', answer:w.en, entry:w}));
   }
   if(levelId==='listen'){
     return take(W,CAP).map(w=>{
@@ -1738,8 +1971,8 @@ function buildQuestions(levelId){
   }
   if(levelId==='write'){
     const qs=[];
-    take(W, Math.min(CAP, W.length)).forEach(w=>qs.push({kind:'write', type:'word', zh:w.zh||'（没有中文）', answer:w.en, entry:w}));
-    take(Ss, Math.min(hard?6:4, Ss.length)).forEach(s=>qs.push({kind:'write', type:'sent', zh:s.zh||'（没有中文）', answer:s.en, entry:s}));
+    take(AW, Math.min(CAP, AW.length)).forEach(w=>qs.push({kind:'write', type:'word', zh:w.zh||'（没有中文）', answer:w.en, entry:w}));
+    take(AS, Math.min(hard?6:4, AS.length)).forEach(s=>qs.push({kind:'write', type:'sent', zh:s.zh||'（没有中文）', answer:s.en, entry:s}));
     return shuffle(qs);
   }
   return [];
@@ -1748,24 +1981,111 @@ function buildQuestions(levelId){
 /* =========================================================
    闯关引擎
    ========================================================= */
-const Run = {id:null, qs:[], i:0, stars:0, right:0, combo:0, locked:false, tries:0};
+const Run = {id:null, qs:[], i:0, stars:0, right:0, combo:0, locked:false, tries:0, qSeq:0};
 const MAX_TRIES = 3;
 
 /* =========================================================
    断点续做：内容、完成情况、正在做的那一关，全部落盘
    （误触返回、Safari 自己刷新、切换 App 回来，都不会丢）
    ========================================================= */
-const KS = {session:'dxxg.session', run:'dxxg.run'};
+const KS = {session:profileKey('dxxg.session'), run:profileKey('dxxg.run'),
+  materials:profileKey('dxxg.materials.v1')};
+const SOURCE_NAMES={teacher:'老师知识梳理',textbook:'课本',worksheet:'练习资料',other:'其他'};
+function materialList(){
+  const rows=load(KS.materials,[]);
+  return Array.isArray(rows)?rows:[];
+}
+function materialKeys(row){
+  return new Set([...(row.words||[]).map(x=>'w:'+norm(x.en)),...(row.sents||[]).map(x=>'s:'+norm(x.en))].filter(x=>x.length>2));
+}
+function materialDuplicate(candidate){
+  const keys=materialKeys(candidate);
+  if(keys.size<3) return null;
+  const unit=String(candidate.unit||'').replace(/\s+/g,'').toLowerCase();
+  let best=null;
+  for(const row of materialList()){
+    const otherUnit=String(row.unit||'').replace(/\s+/g,'').toLowerCase();
+    if(unit&&otherUnit&&unit!==otherUnit) continue;
+    const prior=materialKeys(row);
+    const common=[...keys].filter(x=>prior.has(x)).length;
+    const total=Math.max(keys.size,prior.size);
+    const exact=common===keys.size&&common===prior.size&&common>=3;
+    const near=common>=4&&common/total>=.8&&row.source===candidate.source&&!!unit&&unit===otherUnit;
+    if(!exact&&!near) continue;
+    const match={row,exact,ratio:Math.round(common/total*100)};
+    if(exact) return match;
+    if(!best||match.ratio>best.ratio) best=match;
+  }
+  return best;
+}
+function importMaterial(candidate){
+  const open=row=>{clearRun();loadMaterial(row);saveSession();go('review');toast('这份资料已有，已打开原资料');};
+  const create=()=>{
+    clearRun(); S.materialId=''; S.source=candidate.source; S.title=candidate.title; S.notes=candidate.notes;
+    S.words=candidate.words; S.sents=candidate.sents; S.unit=candidate.unit; S.done={};
+    S.ignored=candidate.ignored||''; S.fixed=candidate.fixed||[];
+    saveSession();go('review');
+  };
+  const match=materialDuplicate(candidate);
+  if(match?.exact){open(match.row);return;}
+  if(match){
+    showModal('发现相似资料','已有 <b>'+esc(match.row.unit||match.row.title||'一份资料')+'</b>，词句约 '+match.ratio+'% 相同。',[
+      {t:'打开已有',primary:true,fn:()=>open(match.row)},
+      {t:'另存新资料',fn:create}
+    ],true);
+    return;
+  }
+  create();
+}
+function removeMaterial(id){
+  const rows=materialList().filter(x=>x.id!==id);
+  if(rows.length===materialList().length) return;
+  try{localStorage.setItem(KS.materials,JSON.stringify(rows));}
+  catch(e){toast('移除失败，请先导出备份');return;}
+  if(S.materialId===id){
+    clearRun();
+    const next=rows.sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0))[0];
+    if(next){loadMaterial(next);saveSession();}else clearActiveMaterial();
+  }
+  queueCloudSync();go('home');toast('资料已移除，学习记录保留');
+}
+function materialSnapshot(){
+  return {id:S.materialId,source:S.source,title:S.title,notes:S.notes,
+    words:S.words,sents:S.sents,done:S.done,unit:S.unit,updatedAt:Date.now()};
+}
+function loadMaterial(d){
+  S.words=(Array.isArray(d.words)?d.words:[]).map(x=>({...x,tier:['A','B','C'].includes(x.tier)?x.tier:'A'}));
+  S.sents=(Array.isArray(d.sents)?d.sents:[]).map(x=>({...x,tier:['A','B','C'].includes(x.tier)?x.tier:'A'}));
+  S.done=d.done||{}; S.unit=String(d.unit||'').slice(0,40);
+  S.materialId=d.id||('m-'+Date.now().toString(36));
+  S.source=SOURCE_NAMES[d.source]?d.source:'teacher';
+  S.title=String(d.title||'').slice(0,60);
+  S.notes=Array.isArray(d.notes)?d.notes:[];
+}
+function clearActiveMaterial(){
+  S.words=[]; S.sents=[]; S.unit=''; S.done={}; S.materialId=''; S.title=''; S.notes=[];
+  try{localStorage.removeItem(KS.session);}catch(e){}
+  clearRun();
+}
 function saveSession(){
-  save(KS.session, {words:S.words, sents:S.sents, done:S.done, unit:S.unit});
+  if(!S.words.length&&!S.sents.length&&!S.notes.length) return;
+  if(!S.materialId) S.materialId='m-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,7);
+  const entry=materialSnapshot();
+  try{
+    localStorage.setItem(KS.session,JSON.stringify(entry));
+    const rows=materialList(), at=rows.findIndex(x=>x.id===entry.id);
+    if(at<0) rows.push(entry); else rows[at]=entry;
+    localStorage.setItem(KS.materials,JSON.stringify(rows));
+    queueCloudSync();
+  }catch(e){ toast('本机空间不足，资料未保存；请导出备份'); }
 }
 function restoreSession(){
-  const d = load(KS.session, null);
+  const d = load(KS.session, null)||materialList().sort((a,b)=>b.updatedAt-a.updatedAt)[0];
   if(!d) return false;
   const w = Array.isArray(d.words)?d.words:[];
   const s = Array.isArray(d.sents)?d.sents:[];
-  if(!w.length && !s.length) return false;
-  S.words = w; S.sents = s; S.done = d.done || {}; S.unit=String(d.unit||'').slice(0,40);
+  if(!w.length && !s.length && !(Array.isArray(d.notes)&&d.notes.length)) return false;
+  loadMaterial(d); saveSession();
   return true;
 }
 function saveRun(){
@@ -1821,6 +2141,7 @@ function playHeader(extra){
 }
 function renderQ(){
   const q = Run.qs[Run.i];
+  Run.qSeq++;
   Run.locked=false;
   Run.tries=0;                                 // 每道题 3 次机会，重新开始数
   Run.reveal=null;
@@ -1916,6 +2237,7 @@ function vChoose(q){
     <div class="qcard" id="qc">
       <div class="q-zh">${esc(q.zh)}</div>
       <div class="q-hint">选出对应的英文</div>
+      <div class="choice-feedback" id="choiceFeedback" aria-live="polite"></div>
     </div>
     <div class="opts" id="opts">
       ${q.options.map((o,i)=>`<button class="opt" data-o="${esc(o)}">${esc(o)}</button>`).join('')}
@@ -1937,7 +2259,23 @@ function vChoose(q){
     Run.locked=true;
     b.classList.add('good');
     scoreMark(true, Run.tries===0);
-    gotoNext();
+    const seq=Run.qSeq, at=Run.i;
+    const active=()=>route==='play'&&Run.id==='choose'&&Run.i===at&&Run.qSeq===seq;
+    $('#choiceFeedback').textContent='🔊 听英文 × '+Settings.choiceRepeats;
+    void (async()=>{
+      for(let repeat=0;repeat<Settings.choiceRepeats;repeat++){
+        await speakWait(q.answer,.75);
+        if(!active()) return;
+      }
+      $('#choiceFeedback').innerHTML=Settings.choicePause+' 秒后下一题<div class="choice-next-track"><i></i></div>';
+      $('#choiceFeedback .choice-next-track i').style.setProperty('--choice-pause',Settings.choicePause+'s');
+      setTimeout(function advance(){
+        if(!active()) return;
+        if($('#modal')){ setTimeout(advance,100); return; }
+        Run.i++;
+        if(Run.i>=Run.qs.length) finishLevel(); else renderQ();
+      },Settings.choicePause*1000);
+    })();
   });
 }
 
@@ -2584,8 +2922,8 @@ function renderStats(){
    老师式默写（本地预览）
    ponytail: 笔迹图片只放内存，判分记录存本机；需要跨设备同步时再做账户与数据迁移。
    ========================================================= */
-const REVIEW_KEY='dxxg.review.v1';
-const REVIEW_DEVICE_KEY='dxxg.review.device';
+const REVIEW_KEY=profileKey('dxxg.review.v1');
+const REVIEW_DEVICE_KEY=profileKey('dxxg.review.device');
 const REVIEW_DEVICE_ID=(()=>{
   const saved=load(REVIEW_DEVICE_KEY,'');
   if(saved) return saved;
@@ -2603,7 +2941,7 @@ function reviewDayAdd(day,n){
   const d=new Date(p[0],p[1]-1,p[2]+n);
   return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
 }
-function reviewKey(x){ return JSON.stringify([x.unit,x.kind,norm(x.en)]); }
+function reviewKey(x){ return JSON.stringify([x.materialId||x.source||'teacher',x.unit,x.kind,norm(x.en)]); }
 function reviewProgress(){
   const items=Object.create(null);
   for(const session of Review.sessions){
@@ -2613,17 +2951,18 @@ function reviewProgress(){
       if(!x||!x.unit||!x.en||typeof x.ok!=='boolean') continue;
       const key=reviewKey(x), old=items[key];
       let level=old?old.level:0, due=old?old.due:reviewDayAdd(day,1);
-      const passed=x.ok===true&&!x.expired;
+      const passed=x.ok===true&&!x.expired&&!x.skipped;
       if(!passed){ level=0; due=reviewDayAdd(day,1); }
       else if(!old){ level=1; due=reviewDayAdd(day,1); }
       else if(old.lastDay!==day && old.due<=day){
         level=Math.min(old.level+1,REVIEW_GAPS.length);
         due=reviewDayAdd(day,REVIEW_GAPS[level-1]);
       }
-      items[key]={unit:x.unit,kind:x.kind,en:x.en,zh:x.zh||'',level,due,
+      items[key]={unit:x.unit,kind:x.kind,en:x.en,zh:x.zh||'',source:x.source||'teacher',materialId:x.materialId||'',level,due,
         lastDay:day,lastOk:passed,attempts:(old?.attempts||0)+1,
-        wrongCount:(old?.wrongCount||0)+(x.ok===false&&!x.expired?1:0),
-        timeoutCount:(old?.timeoutCount||0)+(x.expired?1:0)};
+        wrongCount:(old?.wrongCount||0)+(x.ok===false&&!x.expired&&!x.skipped?1:0),
+        timeoutCount:(old?.timeoutCount||0)+(x.expired?1:0),
+        skipCount:(old?.skipCount||0)+(x.skipped?1:0)};
     }
   }
   return Object.values(items);
@@ -2639,15 +2978,16 @@ function reviewDoneToday(){
     for(const x of s.entries||[]) keys.add(reviewKey(x));
   return keys.size;
 }
-function reviewDueBatch(){ return reviewDueAll().slice(0,Math.max(0,10-reviewDoneToday())); }
+function reviewDueBatch(){ return reviewDueAll().slice(0,Math.max(0,Settings.reviewDailyCap-reviewDoneToday())); }
 function reviewSave(){
-  try{ localStorage.setItem(REVIEW_KEY,JSON.stringify({sessions:Review.sessions})); return true; }
+  try{ localStorage.setItem(REVIEW_KEY,JSON.stringify({sessions:Review.sessions})); queueCloudSync(); return true; }
   catch(e){ toast('本机空间不足，记录未保存；请先导出备份'); return false; }
 }
 function reviewSyncSession(){
   if(Dict.source==='sample'||!Dict.id||!Dict.records.length) return true;
   const entries=Dict.items.map((x,i)=>({unit:x.unit||S.unit,kind:x.kind,en:x.en,zh:x.zh,
-    ok:Dict.records[i].ok,expired:!!Dict.records[i].expired,
+    source:x.source||S.source,materialId:x.materialId||S.materialId,
+    ok:Dict.records[i].ok,expired:!!Dict.records[i].expired,skipped:!!Dict.records[i].skipped,
     answer:String(Dict.records[i].answer||'').slice(0,160)}));
   const session={id:Dict.id,at:Dict.startedAt,day:Dict.day,source:Dict.source,
     phase:Dict.phase,mode:Dict.mode,retryOf:Dict.retryOf||'',entries};
@@ -2672,16 +3012,17 @@ function startReviewToday(){
 }
 function reviewUnitGroups(items,showAnswer){
   const groups=new Map();
-  for(const x of items){ if(!groups.has(x.unit)) groups.set(x.unit,[]); groups.get(x.unit).push(x); }
-  return [...groups].sort((a,b)=>a[0].localeCompare(b[0])).map(([unit,rows])=>
-    '<details class="plan-unit" open><summary>'+esc(unit)+' · '+rows.length+' 题</summary>'+
+  for(const x of items){ const group=(SOURCE_NAMES[x.source]||SOURCE_NAMES.teacher)+' · '+x.unit;
+    if(!groups.has(group)) groups.set(group,[]); groups.get(group).push(x); }
+  return [...groups].sort((a,b)=>a[0].localeCompare(b[0])).map(([group,rows])=>
+    '<details class="plan-unit" open><summary>'+esc(group)+' · '+rows.length+' 题</summary>'+
     rows.map(x=>'<div class="plan-row">'+esc(x.zh)+
-      (showAnswer?'<b>'+esc(x.en)+'</b><p class="sub">写错 '+x.wrongCount+' 次 · 来不及 '+(x.timeoutCount||0)+' 次 · 下次 '+x.due+'</p>':'')+
+      (showAnswer?'<b>'+esc(x.en)+'</b><p class="sub">写错 '+x.wrongCount+' 次 · 来不及 '+(x.timeoutCount||0)+' 次 · 跳过 '+(x.skipCount||0)+' 次 · 下次 '+x.due+'</p>':'')+
       '</div>').join('')+'</details>').join('');
 }
 function renderPlan(){
   const progress=reviewProgress(), all=reviewDueAll(), batch=reviewDueBatch();
-  const wrong=progress.filter(x=>x.wrongCount>0||x.timeoutCount>0).sort((a,b)=>
+  const wrong=progress.filter(x=>x.wrongCount>0||x.timeoutCount>0||x.skipCount>0).sort((a,b)=>
     a.unit.localeCompare(b.unit)||Number(a.lastOk)-Number(b.lastOk)||b.wrongCount-a.wrongCount);
   const future=new Map();
   for(const x of progress.filter(x=>x.due>today()).sort((a,b)=>a.due.localeCompare(b.due))){
@@ -2709,10 +3050,12 @@ function renderPlan(){
       const entries=Array.isArray(s.entries)?s.entries:[];
       return '<div class="plan-row"><b>'+esc(s.day||'')+' · '+esc([...new Set(entries.map(x=>x.unit))].join('、'))+'</b>'+
         '<p class="sub">写对 '+entries.filter(x=>x.ok===true&&!x.expired).length+'/'+entries.length+
-        ' · 来不及 '+entries.filter(x=>x.expired).length+
+        ' · 来不及 '+entries.filter(x=>x.expired).length+' · 主动跳过 '+entries.filter(x=>x.skipped).length+
         (s.retryOf?' · 补写':'')+' · '+(s.source==='due'?'到期复习':'本课默写')+'</p></div>';
     }).join(''):'<p class="sub">完成一次本课默写后会留下记录。</p>')+
-    '<button class="btn sm ghost" id="planExport" style="margin-top:14px">⬇️ 导出本机学习档案</button></div>'+
+    '<div class="row" style="margin-top:14px"><button class="btn sm ghost" id="planExport">⬇️ 导出学习档案</button>'+
+    '<button class="btn sm ghost" id="planImport">⬆️ 恢复旧档案</button></div>'+
+    '<input type="file" id="planImportFile" accept="application/json,.json" class="hide"></div>'+
     '<details class="card"><summary style="font-weight:800;cursor:pointer">复习规则与提醒</summary>'+
     '<p class="sub">首次答对次日复习；之后答对逐步间隔 3、7、14 天。答错次日再练；同一天重复写对不延长间隔。此排程是试用规则，需用真实记录调整。</p>'+
     '<p class="sub">每天 19:30 提醒打开本页；只有今天到期的题才练。在 iPad 点下方链接订阅一次。</p>'+
@@ -2720,20 +3063,60 @@ function renderPlan(){
     '</details></div>';
   if($('#planStart')) $('#planStart').onclick=startReviewToday;
   $('#planExport').onclick=exportLearningArchive;
+  $('#planImport').onclick=()=>$('#planImportFile').click();
+  $('#planImportFile').onchange=e=>{const file=e.target.files?.[0];if(file) void importLearningArchive(file);};
 }
 function exportLearningArchive(){
-  const data={schemaVersion:1,exportedAt:new Date().toISOString(),
+  const data={schemaVersion:2,profileId:Profile,exportedAt:new Date().toISOString(),
     deviceId:REVIEW_DEVICE_ID,
-    description:'英语默写小闯关学习档案。仅含学习记录和当前课次；不含 API Key、手写图片。',
+    description:'英语默写小闯关学习档案。含分类资料和默写记录；不含 API Key、老师照片、手写图片。',
     schedule:'答对后约 1/3/7/14 天复习，答错次日复习；同日重复不延长。',
     dictationSessions:Review.sessions,activeLesson:load(KS.session,null),
+    materials:materialList(),settings:Settings,
     previousWrongBook:Store.wrong,previousStats:Store.stats,grade:Store.grade};
   const url=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}));
   const a=document.createElement('a');
-  a.href=url; a.download='英语默写学习档案-'+today()+'-'+REVIEW_DEVICE_ID.slice(-6)+'.json';
+  a.href=url; a.download='英语默写学习档案-'+PROFILE_NAMES[Profile]+'-'+today()+'.json';
   document.body.appendChild(a); a.click(); a.remove();
   toast('下载后请传到电脑上的孩子存档目录');
   setTimeout(()=>URL.revokeObjectURL(url),30000);
+}
+async function importLearningArchive(file){
+  try{
+    if(file.size>5*1024*1024) throw Error('档案太大，请先检查文件');
+    const data=JSON.parse(await file.text());
+    if(data.schemaVersion!==2||!Array.isArray(data.materials)||!Array.isArray(data.dictationSessions)
+      ||data.materials.length>200||data.dictationSessions.length>1000)
+      throw Error('不是有效的学习档案');
+    if(data.profileId&&data.profileId!==Profile) throw Error('这份档案属于另一位孩子');
+    if(materialList().length||Review.sessions.length||Store.wrong.length)
+      throw Error('当前档案已有记录，请先导出备份，再决定如何合并');
+    showModal('确认归属','将 <b>'+esc(file.name)+'</b> 恢复到 <b>'+PROFILE_NAMES[Profile]+'</b> 的独立档案？',[
+      {t:'取消'},
+      {t:'确认恢复',primary:true,fn:async()=>{
+        const values=[[KS.materials,data.materials],[REVIEW_KEY,{sessions:data.dictationSessions}],
+          [KS.session,data.activeLesson||null],[K.wrong,Array.isArray(data.previousWrongBook)?data.previousWrongBook:[]],
+          [K.stats,data.previousStats&&typeof data.previousStats==='object'?data.previousStats:{}],
+          [K.grade,Number(data.grade)||Store.grade],
+          [SETTINGS_KEY,{...SETTINGS_DEFAULT,...(data.settings||{})}]];
+        const old=values.map(([key])=>[key,localStorage.getItem(key)]);
+        try{
+          for(const [key,value] of values){
+            if(value===null) localStorage.removeItem(key);
+            else localStorage.setItem(key,JSON.stringify(value));
+          }
+        }catch(e){
+          for(const [key,value] of old){
+            if(value===null) localStorage.removeItem(key);
+            else localStorage.setItem(key,value);
+          }
+          toast('空间不足，旧档案未恢复');return;
+        }
+        if(Cloud.paired){Cloud.pending=true;await cloudSync();}
+        location.reload();
+      }}
+    ],true);
+  }catch(e){toast(e.message||'无法读取学习档案');}
 }
 const Dict = {
   source:'current', from:'home', mode:'hand', retryOf:'',
@@ -2750,17 +3133,44 @@ const DICT_SAMPLE = [
 ];
 function dictCurrentItems(){
   return [
-    ...S.words.filter(x=>x.on && x.en).map(x=>({kind:'word',en:x.en,zh:x.zh||'',unit:S.unit})),
-    ...S.sents.filter(x=>x.on && x.en).map(x=>({kind:'sent',en:x.en,zh:x.zh||'',unit:S.unit}))
+    ...S.words.filter(x=>x.on && x.en && x.tier==='A').map(x=>({kind:'word',en:x.en,zh:x.zh||'',unit:S.unit,source:S.source,materialId:S.materialId})),
+    ...S.sents.filter(x=>x.on && x.en && x.tier==='A').map(x=>({kind:'sent',en:x.en,zh:x.zh||'',unit:S.unit,source:S.source,materialId:S.materialId}))
   ];
 }
 function dictSourceItems(){
-  if(Dict.source==='due') return reviewDueBatch().map(x=>({kind:x.kind,en:x.en,zh:x.zh,unit:x.unit}));
+  if(Dict.source==='due') return reviewDueBatch().map(x=>({kind:x.kind,en:x.en,zh:x.zh,unit:x.unit,source:x.source,materialId:x.materialId}));
   return Dict.source==='sample' ? DICT_SAMPLE.map(x=>({...x,unit:'示例'})) : dictCurrentItems();
 }
+let dictAudio=null, dictAudioDone=null, dictVoiceSeq=0;
 function dictStop(){
   if(Dict.tick){ clearInterval(Dict.tick); Dict.tick=null; }
+  Dict.ends=0;
+  dictVoiceSeq++;
+  if(dictAudio){ dictAudio.pause(); dictAudio.src=''; dictAudio=null; }
+  if(dictAudioDone){ dictAudioDone(false); dictAudioDone=null; }
   stopSpeak();
+}
+async function dictSpeakChinese(text){
+  const seq=++dictVoiceSeq;
+  const localPreview=location.port==='8101';
+  // ponytail: 8101 试用服务直接用已配置的 Vivi；断网时才退回设备语音。
+  if(!navigator.onLine||(!Cloud.paired&&!localPreview)){ await speakWait(text,1,'zh-CN',true); return seq===dictVoiceSeq; }
+  try{
+    const result=localPreview
+      ? await fetch('/api/tts',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text})}).then(async r=>{if(!r.ok) throw Error('语音服务暂不可用');return r.json();})
+      : await cloudCall('speech',{profileId:Profile,text});
+    if(seq!==dictVoiceSeq) return false;
+    const audio=new Audio('data:audio/mpeg;base64,'+result.audio);
+    dictAudio=audio;
+    const played=await new Promise(resolve=>{
+      dictAudioDone=resolve;
+      audio.onended=()=>resolve(true);
+      audio.onerror=()=>resolve(false);
+      audio.play().catch(()=>resolve(false));
+    });
+    if(dictAudio===audio){dictAudio=null;dictAudioDone=null;}
+    return played&&seq===dictVoiceSeq;
+  }catch{return false;}
 }
 function dictExact(a,b){
   const tidy = s=>fixEnglishApostrophes(s).trim().replace(/\s+/g,' ');
@@ -2774,7 +3184,7 @@ function dictSyllables(text){
     return total+Math.max(1,groups-silentE);
   },0);
 }
-function dictSeconds(x){ return x.kind==='sent'||dictSyllables(x.en)>3?15:10; }
+function dictSeconds(x){ return x.kind==='sent'?Settings.sentenceSeconds:dictSyllables(x.en)>3?Settings.longWordSeconds:Settings.wordSeconds; }
 function dictNear(a,b){ return norm(a)===norm(b); }
 // 复用原第六关的画布；把透明笔迹铺在白底上交给识别服务。
 function dictInkImage(cv){
@@ -2841,7 +3251,7 @@ function renderDictationSetup(){
   const chosen=dictSourceItems();
   const wc=chosen.filter(x=>x.kind==='word').length, sc=chosen.length-wc;
   const sourceHtml=Dict.source==='due'
-    ? '<p>今天安排 '+chosen.length+' 题（每日最多 10 题）</p><button class="btn sm ghost" id="dictBackPlan">返回计划</button>'
+    ? '<p>今天安排 '+chosen.length+' 题（每日最多 '+Settings.reviewDailyCap+' 题）</p><button class="btn sm ghost" id="dictBackPlan">返回计划</button>'
     : '<div class="dict-source"><button class="chip '+(Dict.source==='current'?'on':'')+'" id="dictUseCurrent">本课内容（'+current.length+'）</button>'+
       '<button class="chip '+(Dict.source==='sample'?'on':'')+'" id="dictUseSample">示例（5）</button></div>'+
       (Dict.source==='current'?'<label class="sub">本课 Unit<input id="dictUnit" class="dict-input" style="font-family:inherit" maxlength="40" value="'+esc(S.unit)+'" placeholder="例如 5A Unit 2"></label>':'')+
@@ -2852,7 +3262,9 @@ function renderDictationSetup(){
     '<div class="card"><h2>默写内容</h2>'+
     sourceHtml+'</div>'+
     '<div class="card"><h2>写法与节奏</h2>'+
-    '<div class="dict-meta"><span>单词 10 秒</span><span>4 音节以上 15 秒</span><span>句子 15 秒</span></div>'+
+    '<div class="dict-meta"><span>单词 '+Settings.wordSeconds+' 秒</span><span>4 音节以上 '+Settings.longWordSeconds+' 秒</span><span>句子 '+Settings.sentenceSeconds+' 秒</span></div>'+
+    '<p class="sub">每题先报中文，再开始计时。</p>'+
+    (!Cloud.paired&&location.port!=='8101'?'<p class="sub">连接云端后启用 Vivi 2.0 中文播报。</p>':'')+
     '<div class="dict-source"><button class="chip '+(Dict.mode==='hand'?'on':'')+'" id="dictHand">✍️ 手指／笔，AI 核对</button>'+
     '<button class="chip '+(Dict.mode==='type'?'on':'')+'" id="dictType">⌨️ 打字，自动核对</button></div>'+
     (Dict.mode==='hand'&&AI_STATE==='none'&&!getApiCfg()?'<p class="sub" style="margin-top:12px">手写识别未连接。可点顶部黄条配置，或改用打字。</p>':'')+
@@ -2906,13 +3318,14 @@ function renderDictationQuestion(){
     '<p class="sub center">'+(warm?'摸底':'连测中')+'</p>'+
     (!Dict.feedback?'<div class="dict-time-row"><div class="dict-countdown" id="dictCount">'+seconds+'<small>秒</small></div></div><div class="dict-timer" id="dictTimer"><i id="dictFill"></i></div>':'')+
     '<div class="qcard"><div class="dict-prompt">'+esc(x.zh)+'</div></div>'+
+    (!Dict.feedback?'<button class="btn sm ghost hide" id="dictVoiceRetry" type="button">中文播报失败，点此重试</button>':'')+
     (Dict.feedback ? answerBox+
       (unclear?'<div class="row"><button class="btn primary" id="dictRetry">重新识别</button><button class="btn ghost" id="dictRewrite">重写这题</button></div>':
       '<button class="btn primary" id="dictNext" style="margin-top:12px">下一题</button>') :
       (Dict.mode==='type'?'<input class="dict-input" id="dictInput" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="在这里写英文">':
         '<div class="handwrap dict-hand '+(x.kind==='sent'?'tall':'')+'">'+handGuidesHTML(x.kind==='sent')+'<canvas class="hand" id="dictCanvas" aria-label="在这里手写英文"></canvas></div>'+
         '<div class="row" style="margin-top:8px"><button class="btn sm ghost" id="dictUndo">↩️ 撤销</button><button class="btn sm ghost" id="dictClear">🧹 清空</button></div>')+
-      '<div class="row" style="margin-top:12px"><button class="btn primary" id="dictSubmit">'+(warm?'写好了，系统核对':'写好了，下一题')+'</button></div>')+
+      '<div class="row" style="margin-top:12px"><button class="btn primary" id="dictSubmit">'+(warm?'写好了，系统核对':'写好了，下一题')+'</button><button class="btn ghost" id="dictSkip" type="button" disabled>跳过，下一题</button></div>')+
     '</div></div>';
   $('#dictBack').onclick=exitDictation;
   if(Dict.feedback){
@@ -2934,6 +3347,7 @@ function renderDictationQuestion(){
     return;
   }
   $('#dictSubmit').onclick=()=>dictSave(false);
+  $('#dictSkip').onclick=()=>dictSave(false,true);
   if(Dict.mode==='type'){
     $('#dictInput').onkeydown=e=>{ if(e.key==='Enter'){ e.preventDefault(); dictSave(false); } };
     $('#dictInput').focus();
@@ -2942,7 +3356,19 @@ function renderDictationQuestion(){
     $('#dictUndo').onclick=()=>cv._undo();
     $('#dictClear').onclick=()=>cv._clear();
   }
-  dictStartTimer(seconds);
+  // ponytail: 用题号与轮次挡住旧语音回调；播报结束才计时，避免换题后启动上一题的表。
+  const round=Dict.round, index=Dict.i;
+  const playPrompt=()=>{
+    $('#dictVoiceRetry')?.classList.add('hide');
+    void dictSpeakChinese(x.zh).then(played=>{
+      if(route!=='dictPlay'||Dict.feedback||Dict.round!==round||Dict.i!==index) return;
+      if(played){Dict.voiceReady=true;$('#dictSkip').disabled=false;dictStartTimer(seconds);}
+      else $('#dictVoiceRetry')?.classList.remove('hide');
+    });
+  };
+  Dict.voiceReady=false;
+  $('#dictVoiceRetry').onclick=playPrompt;
+  playPrompt();
 }
 function dictStartTimer(seconds){
   if(Dict.tick) clearInterval(Dict.tick);
@@ -2957,18 +3383,20 @@ function dictStartTimer(seconds){
     if(left<=0) dictSave(true);
   },100);
 }
-async function dictSave(expired){
+async function dictSave(expired,skipped=false){
   if(route!=='dictPlay'||Dict.feedback||Dict.saving||Dict.records.length!==Dict.i) return;
+  if(!Dict.voiceReady){ toast('等中文播报完成'); return; }
   expired=expired||!!(Dict.ends&&Date.now()>=Dict.ends);
+  if(expired) skipped=false;
   const x=Dict.items[Dict.i], answer=Dict.mode==='type'?($('#dictInput')?.value||''):'';
   const cv=Dict.mode==='hand'?$('#dictCanvas'):null;
-  if(cv && !expired && cv._ink<20){ toast('先在格子里写英文'); return; }
+  if(cv && !expired && !skipped && cv._ink<20){ toast('先在格子里写英文'); return; }
   Dict.saving=true;
   const at=Dict.i;
-  Dict.records.push({answer, ok:expired?false:Dict.mode==='type'?dictExact(answer,x.en):cv?undefined:false,
-    ink:cv&&cv._ink>=20?dictInkImage(cv):'', expired});
+  Dict.records.push({answer, ok:expired||skipped?false:Dict.mode==='type'?dictExact(answer,x.en):cv?undefined:false,
+    ink:cv&&cv._ink>=20?dictInkImage(cv):'', expired, skipped});
   dictStop();
-  if(Dict.phase==='warm'&&!expired){
+  if(Dict.phase==='warm'&&!expired&&!skipped){
     if(Dict.mode==='hand'){
       $('#dictSubmit').disabled=true;
       $('#dictSubmit').textContent='正在识别笔迹…';
@@ -2979,7 +3407,7 @@ async function dictSave(expired){
     return;
   }
   // ponytail: 单队列在写下一题时静默识别，避免快速交卷打满模型接口；积压时结果页仍需等待。
-  if(Dict.phase==='mock'&&!expired&&Dict.mode==='hand'){
+  if(Dict.phase==='mock'&&!expired&&!skipped&&Dict.mode==='hand'){
     const round=Dict.round;
     Dict.gradeTail=(Dict.gradeTail||Promise.resolve()).catch(()=>{}).then(()=>round===Dict.round?dictGradeHand(at):undefined);
     Dict.gradeTasks.set(at,Dict.gradeTail);
@@ -2996,33 +3424,35 @@ function renderDictationResult(){
   }
   const saved=reviewSyncSession();
   const total=Dict.items.length;
-  const checked=Dict.records.filter(r=>!r.expired&&r.ok!==null&&r.ok!==undefined).length;
+  const checked=Dict.records.filter(r=>!r.expired&&!r.skipped&&r.ok!==null&&r.ok!==undefined).length;
   const unclear=Dict.records.map((r,i)=>r.ok===null?i:-1).filter(i=>i>=0);
-  const right=Dict.records.filter(r=>r.ok===true&&!r.expired).length;
+  const right=Dict.records.filter(r=>r.ok===true&&!r.expired&&!r.skipped).length;
   const late=Dict.records.map((r,i)=>r.expired?i:-1).filter(i=>i>=0);
-  const wrong=Dict.items.filter((x,i)=>!Dict.records[i].expired&&Dict.records[i].ok===false);
+  const skipped=Dict.records.map((r,i)=>r.skipped?i:-1).filter(i=>i>=0);
+  const pending=[...late,...skipped];
+  const wrong=Dict.items.filter((x,i)=>!Dict.records[i].expired&&!Dict.records[i].skipped&&Dict.records[i].ok===false);
   const rows=Dict.items.map((x,i)=>{
     const r=Dict.records[i];
-    const status=r.expired?'来不及':r.ok===null?'系统未识别':r.ok?'写对':'还需练习';
+    const status=r.expired?'来不及':r.skipped?'主动跳过':r.ok===null?'系统未识别':r.ok?'写对':'还需练习';
     return '<div class="dict-result-row"><div class="zh">'+esc(x.zh)+'　<span class="sub">'+status+'</span></div>'+
       '<div class="en">'+esc(x.en)+'</div>'+
       (Dict.mode==='type'?'<p class="sub">你的答案：'+esc(r.answer||'（未写）')+'</p>':
         (r.ink?'<img class="dict-ink" src="'+r.ink+'" alt="本题手写笔迹">':'')+
-        '<p class="sub">'+(r.expired?'计时结束，未按时交卷':'系统识别：'+esc(r.answer||r.error||'（未写）'))+'</p>'+
+        '<p class="sub">'+(r.expired?'计时结束，未按时交卷':r.skipped?'本题主动跳过':'系统识别：'+esc(r.answer||r.error||'（未写）'))+'</p>'+
         (r.ok===null?'<button class="btn sm ghost" data-dict-retry="'+i+'">重新识别</button>':''))+
       '</div>';
   }).join('');
   $('#wrap').innerHTML='<div class="screen"><div class="card">'+
     '<h1>'+(Dict.phase==='warm'?'摸底结果':'课堂连测结果')+'</h1>'+
     '<p class="sub">'+(Dict.mode==='hand'
-      ?(total-late.length?'系统核对 '+checked+'/'+(total-late.length)+' 题'+(unclear.length?'，未识别 '+unclear.length+' 题可重试。':'。'):'这轮都来不及，先补写。')
+      ?(total-pending.length?'系统核对 '+checked+'/'+(total-pending.length)+' 题'+(unclear.length?'，未识别 '+unclear.length+' 题可重试。':'。'):'这轮都未完成，先补写。')
       :'本轮第一次独立写对的题数。')+'</p>'+
-    '<div class="dict-meta"><span>按时写对 '+right+'/'+total+'</span><span>来不及 '+late.length+' 题</span></div>'+
+    '<div class="dict-meta"><span>按时写对 '+right+'/'+total+'</span><span>来不及 '+late.length+' 题</span><span>主动跳过 '+skipped.length+' 题</span></div>'+
     '<p class="sub">'+(Dict.source==='sample'?'示例结果不保存。':saved?'结果已存在这台设备，按 Unit 安排下次复习。':'本机记录未保存，请立即导出档案。')+'</p>'+
     rows+
     (!saved?'<button class="btn primary" id="dictExportNow">导出学习档案</button>':'')+
     (unclear.length?'<button class="btn sm ghost" id="dictRetryAll" style="margin-top:12px">重新识别未判的 '+unclear.length+' 题</button>':'')+
-    (late.length?'<button class="btn primary" id="dictMakeUp" style="margin-top:12px">补写来不及的 '+late.length+' 题</button>':'')+
+    (pending.length?'<button class="btn primary" id="dictMakeUp" style="margin-top:12px">补写未完成的 '+pending.length+' 题</button>':'')+
     '<div class="row" style="margin-top:16px"><button class="btn primary" id="dictAgain">'+(Dict.source==='due'?'返回复习计划':Dict.phase==='warm'?'按课堂节奏连测':'完整再测一轮')+'</button>'+
     (wrong.length?'<button class="btn ghost" id="dictWrong">只练写错的题</button>':'')+'</div>'+
     '<button class="btn sm ghost" id="dictSetup" style="margin-top:12px">返回设置</button>'+
@@ -3041,7 +3471,7 @@ function renderDictationResult(){
   if($('#dictExportNow')) $('#dictExportNow').onclick=exportLearningArchive;
   if($('#dictMakeUp')) $('#dictMakeUp').onclick=()=>{
     const original=Dict.retryOf||Dict.id;
-    Dict.items=late.map(i=>Dict.items[i]);
+    Dict.items=pending.map(i=>Dict.items[i]);
     Dict.retryOf=original;
     dictStart('warm',true);
   };
@@ -3065,6 +3495,7 @@ $('#btnHome').onclick = ()=>{
 };
 $('#btnWrong').onclick = ()=>go('wrong');
 $('#btnStats').onclick = ()=>go('stats');
+$('#btnSettings').onclick = ()=>go('settings');
 $('#btnSound').onclick = ()=>{
   Store.sound = !Store.sound; save(K.sound, Store.sound);
   $('#btnSound').textContent = Store.sound?'🔊':'🔇';
@@ -3095,8 +3526,11 @@ applyHashConfig();                    // 支持一次性配置链接 …/#k=你�
 window.addEventListener('hashchange', ()=>{
   if(applyHashConfig()){ refreshAiBadge(); toast('AI 识别已配置 ✅', 1600); }
 });
-restoreSession();
-if(restoreRun()){ go('levels'); } else { go('home'); }
+if(Profile){
+  restoreSession();
+  if(Cloud.paired) queueCloudSync();
+  if(restoreRun()){ go('levels'); } else { go('home'); }
+}else go('profile');
 </script>
 </body>
 </html>
