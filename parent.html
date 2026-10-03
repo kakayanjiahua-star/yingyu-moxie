@@ -146,11 +146,12 @@ function render(){
   const match=x=>(source==='all'||x.source===source)&&(unit==='all'||x.unit===unit);
   const wrong=plan.filter(x=>match(x)&&(x.wrongCount||x.timeoutCount||x.skipCount));
   const due=plan.filter(x=>match(x)&&x.due<=new Date().toLocaleDateString('sv-SE'));
-  const recent=sessions.map(s=>({...s,entries:(s.entries||[]).filter(match)})).filter(s=>s.entries.length).sort((a,b)=>b.at-a.at).slice(0,8);
+  const relevant=sessions.map(s=>({...s,entries:(s.entries||[]).filter(match)})).filter(s=>s.entries.length);
+  const recent=relevant.slice().sort((a,b)=>b.at-a.at).slice(0,8);
   const today=new Date().toLocaleDateString('sv-SE');
   const week=new Date();week.setDate(week.getDate()-6);
-  $('todayCount').textContent=sessions.filter(s=>s.day===today).length;
-  $('weekCount').textContent=sessions.filter(s=>s.day>=week.toLocaleDateString('sv-SE')).length;
+  $('todayCount').textContent=relevant.filter(s=>s.day===today).length;
+  $('weekCount').textContent=relevant.filter(s=>s.day>=week.toLocaleDateString('sv-SE')).length;
   $('wrongCount').textContent=wrong.length;
   $('exportData').disabled=!archive;
   list('wrongList',wrong,x=>'<div class="item"><span class="muted">'+esc(x.unit)+' · '+esc(SOURCE[x.source]||'其他')+'</span><strong>'+esc(x.en)+'</strong>'+esc(x.zh)+'<br><span class="muted">写错 '+(x.wrongCount||0)+' 次 · 来不及 '+(x.timeoutCount||0)+' 次 · 跳过 '+(x.skipCount||0)+' 次 · 下次 '+esc(x.due)+'</span></div>','暂无待加强题');

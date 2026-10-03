@@ -434,7 +434,7 @@ body[data-font-size="extra"] .btn{font-size:20px}
    英语默写小闯关 — 单文件版
    流程：拍照/粘贴 → 校对 → 闯关 → 默写测 → 错词本
    ========================================================= */
-const APP_VERSION = 'v2026-10-03';
+const APP_VERSION = 'v2026-10-03.1';
 const $  = (s,r=document)=>r.querySelector(s);
 const $$ = (s,r=document)=>[...r.querySelectorAll(s)];
 const esc = s => String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
@@ -1210,7 +1210,7 @@ function renderSettings(){
     </form>
     <div style="border-top:1px solid var(--line);margin-top:26px;padding-top:18px">
       <h2>云端记录</h2><p class="sub" id="cloudStatus"></p>
-      <p class="sub">在 WordKid 家长端的“默写记录”生成配对码，只需连接一次。</p>
+      <p class="sub">在家长页生成配对码，只需连接一次。</p>
       <div class="row"><input id="cloudCode" class="dict-input" inputmode="numeric" autocomplete="one-time-code" maxlength="12" placeholder="12 位配对码" aria-label="默写配对码">
       <button class="btn sm ghost" id="cloudPair" type="button">连接</button></div>
     </div>
