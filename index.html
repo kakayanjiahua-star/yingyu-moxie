@@ -434,7 +434,7 @@ body[data-font-size="extra"] .btn{font-size:20px}
    英语默写小闯关 — 单文件版
    流程：拍照/粘贴 → 校对 → 闯关 → 默写测 → 错词本
    ========================================================= */
-const APP_VERSION = 'v2026-10-04';
+const APP_VERSION = 'v2026-10-03.1';
 const $  = (s,r=document)=>r.querySelector(s);
 const $$ = (s,r=document)=>[...r.querySelectorAll(s)];
 const esc = s => String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
@@ -550,7 +550,6 @@ async function cloudBind(code){
   const app=await cloudApp();
   await app.auth().signInWithCustomTicket(()=>Promise.resolve(result.ticket));
   Cloud.paired=true; Cloud.profileId=result.profileId; Cloud.error=''; cloudSaveState();
-  AI_STATE='unknown';
   queueCloudSync();
 }
 function cloudPaintStatus(){
@@ -868,21 +867,12 @@ async function ensureWorker(onMsg){
    拍照识别 · 路线一：本地 AI 服务（视觉大模型，准）
    key 在电脑上，网页里没有；iPad 只跟电脑说话
    ========================================================= */
-let AI_STATE = 'unknown';   // cloud | ready | direct | degraded | none | unknown
+let AI_STATE = 'unknown';   // ready | direct | degraded | none | unknown
 let AI_LAST_ERROR = '';
 async function checkAi(){
-  // 已配置过的旧设备仍可沿用本机 Key。
+  // ① 本机直连模式（公网页面用这个）：Key 存在这台设备里
   if(getApiCfg()){ AI_STATE = 'direct'; AI_LAST_ERROR = ''; return AI_STATE; }
-  // 公网设备统一走默写专用云函数；照片与笔迹只在当次请求中使用。
-  if(location.hostname==='kakayanjiahua-star.github.io'){
-    try{
-      const status=await cloudCall('visionStatus',{profileId:Profile});
-      if(status.configured){AI_STATE='cloud';AI_LAST_ERROR='';return AI_STATE;}
-      AI_LAST_ERROR='云端识别尚未配置';
-    }catch(e){AI_LAST_ERROR='先连接家长账号';}
-    AI_STATE='none';return AI_STATE;
-  }
-  // 局域网备用服务。
+  // ② 局域网模式：电脑上的服务
   try{
     const r = await fetch('api/health', {cache:'no-store'});
     const j = await r.json();
@@ -1002,27 +992,13 @@ function splitMultiSentences(en, zh){
 }
 
 /* 浏览器直接调百炼 */
-async function imageBase64(blob){
-  return await new Promise((res,rej)=>{
+async function vlmDirect(cfg, blob, prompt=OCR_PROMPT){
+  const b64 = await new Promise((res,rej)=>{
     const fr = new FileReader();
     fr.onload = ()=>res(String(fr.result).split(',')[1]);
     fr.onerror = ()=>rej(new Error('图片读取失败'));
     fr.readAsDataURL(blob);
   });
-}
-// ponytail: 云函数单次请求上限为 6MB；照片超过 3MB 时逐级缩小，保留优先可读的大图。
-async function cloudPhoto(file,firstBlob){
-  let blob=firstBlob;
-  for(const [side,quality] of [[1800,.82],[1400,.72],[1100,.65]]){
-    if(blob.size<=3000000) return await imageBase64(blob);
-    blob=await shrink(file,side,quality);
-    if(!blob) throw new Error('图片处理失败');
-  }
-  if(blob.size>3000000) throw new Error('图片太大，请拍近一些或选择更清晰的单页照片');
-  return await imageBase64(blob);
-}
-async function vlmDirect(cfg, blob, prompt=OCR_PROMPT){
-  const b64 = await imageBase64(blob);
   const url = cfg.base.replace(/\/+$/,'') + '/compatible-mode/v1/chat/completions';
   const r = await fetch(url, {
     method:'POST',
@@ -1054,9 +1030,6 @@ function ocrTier(section){ return ['A','B','C'].includes(String(section||'').toU
 
 async function aiOcr(files, onProgress){
   const direct = getApiCfg();
-  if(!direct&&location.hostname==='kakayanjiahua-star.github.io'&&
-     AI_STATE!=='cloud'&&await checkAi()!=='cloud')
-    throw new Error(AI_LAST_ERROR||'请先连接家长账号');
   const acc = {words:[], sentences:[], notes:[], model:''};
   const total = files.length;
   for(let i=0;i<total;i++){
@@ -1076,9 +1049,6 @@ async function aiOcr(files, onProgress){
       j = { ok:true, schemaVersion:2, model: direct.model || 'qwen3-vl-plus',
             words:data.words||[], sentences:data.sentences||[], notes:data.notes||[],
             fixed: data.fixed || [], ignored: data.ignored || '', unit:data.unit || '' };
-    }else if(AI_STATE==='cloud'||Cloud.paired){
-      const data=await cloudCall('ocr',{profileId:Profile,mime:'image/jpeg',image:await cloudPhoto(files[i],blob)});
-      j={ok:true,...data};
     }else{
       const r = await fetch('api/ocr', {
         method:'POST',
@@ -1240,7 +1210,7 @@ function renderSettings(){
     </form>
     <div style="border-top:1px solid var(--line);margin-top:26px;padding-top:18px">
       <h2>云端记录</h2><p class="sub" id="cloudStatus"></p>
-      <p class="sub">家长用电脑或手机打开 <a href="./parent.html" target="_blank" rel="noopener">家长页</a> 生成配对码，只需连接一次。</p>
+      <p class="sub">在家长页生成配对码，只需连接一次。</p>
       <div class="row"><input id="cloudCode" class="dict-input" inputmode="numeric" autocomplete="one-time-code" maxlength="12" placeholder="12 位配对码" aria-label="默写配对码">
       <button class="btn sm ghost" id="cloudPair" type="button">连接</button></div>
     </div>
@@ -1399,7 +1369,7 @@ async function refreshAiBadge(){
   const paint = ()=>{
     const el = $('#aiBadge'); if(!el) return;
     el.onclick = null;
-    if(AI_STATE==='ready'||AI_STATE==='cloud'){
+    if(AI_STATE==='ready'){
       el.className='aibadge ok';
       el.innerHTML='✅ <b>拍照识别可用</b>';
     }else if(AI_STATE==='direct'){
@@ -1411,10 +1381,8 @@ async function refreshAiBadge(){
       el.onclick=()=>{ AI_STATE='unknown'; paint(); refreshAiBadge(); };
     }else if(AI_STATE==='none'){
       el.className='aibadge warn';
-      el.innerHTML=location.hostname==='kakayanjiahua-star.github.io'
-        ? '⚠️ <b>先连接家长账号</b> · 点这里连接'
-        : '⚠️ <b>拍照识别待配置</b> · 点这里配置';
-      el.onclick=()=>{ if(location.hostname==='kakayanjiahua-star.github.io') go('settings'); else openKeySetup(); };
+      el.innerHTML='⚠️ <b>拍照识别待配置</b> · 点这里配置';
+      el.onclick=()=>{ openKeySetup(); };
     }else{
       el.className='aibadge wait';
       el.innerHTML='正在检查识别引擎…';
@@ -3234,9 +3202,7 @@ async function dictGradeHand(i){
   try{
     const blob=await (await fetch(r.ink)).blob();
     let data;
-    if(!cfg&&(AI_STATE==='cloud'||Cloud.paired))
-      data=await cloudCall('handwrite',{profileId:Profile,mime:'image/jpeg',image:await imageBase64(blob)});
-    else if(cfg) data=await vlmDirect(cfg,blob,DICT_HAND_PROMPT);
+    if(cfg) data=await vlmDirect(cfg,blob,DICT_HAND_PROMPT);
     else{
       if(AI_STATE!=='ready' && await checkAi()!=='ready') throw new Error('识别服务未连接');
       const response=await fetch('api/handwrite',{method:'POST',headers:{'Content-Type':'image/jpeg'},body:blob});
@@ -3301,7 +3267,7 @@ function renderDictationSetup(){
     (!Cloud.paired&&location.port!=='8101'?'<p class="sub">连接云端后启用 Vivi 2.0 中文播报。</p>':'')+
     '<div class="dict-source"><button class="chip '+(Dict.mode==='hand'?'on':'')+'" id="dictHand">✍️ 手指／笔，AI 核对</button>'+
     '<button class="chip '+(Dict.mode==='type'?'on':'')+'" id="dictType">⌨️ 打字，自动核对</button></div>'+
-    (Dict.mode==='hand'&&AI_STATE==='none'&&!getApiCfg()?'<p class="sub" style="margin-top:12px">手写识别未连接。请先在首页“设置”连接家长账号。</p>':'')+
+    (Dict.mode==='hand'&&AI_STATE==='none'&&!getApiCfg()?'<p class="sub" style="margin-top:12px">手写识别未连接。可点顶部黄条配置，或改用打字。</p>':'')+
     '<div class="row" style="margin-top:14px"><button class="btn primary" id="dictStartWarm">先摸底</button>'+
     '<button class="btn ghost" id="dictStartMock">直接课堂连测</button></div></div></div>';
   if($('#dictUseCurrent')) $('#dictUseCurrent').onclick=()=>{ Dict.source='current'; renderDictationSetup(); };
@@ -3317,8 +3283,8 @@ function renderDictationSetup(){
 }
 async function dictStart(phase, useExisting=false){
   if(!useExisting){
-    if(Dict.mode==='hand'&&!getApiCfg()&&!['ready','cloud'].includes(AI_STATE)&&!['ready','cloud'].includes(await checkAi())){
-      toast('手写识别未连接，请先连接家长账号或改用打字'); return;
+    if(Dict.mode==='hand'&&!getApiCfg()&&AI_STATE!=='ready'&&await checkAi()!=='ready'){
+      toast('手写识别未连接，请先配置或改用打字'); return;
     }
     if(Dict.source==='current'&&!S.unit.trim()){ toast('先填本课 Unit，错题才能归类'); return; }
     Dict.fullItems=dictSourceItems();
