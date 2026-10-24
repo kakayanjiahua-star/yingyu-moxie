@@ -434,7 +434,7 @@ body[data-font-size="extra"] .btn{font-size:20px}
    英语默写小闯关 — 单文件版
    流程：拍照/粘贴 → 校对 → 闯关 → 默写测 → 错词本
    ========================================================= */
-const APP_VERSION = 'v2026-10-11';
+const APP_VERSION = 'v2026-10-24';
 const $  = (s,r=document)=>r.querySelector(s);
 const $$ = (s,r=document)=>[...r.querySelectorAll(s)];
 const esc = s => String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
@@ -447,7 +447,7 @@ const uniq  = a=>[...new Set(a)];
 /* ---------- 持久化 ---------- */
 const PROFILE_ACTIVE_KEY='dxxg.activeProfile.v1';
 const PROFILE_OWNER_KEY='dxxg.deviceOwner.v1';
-const PROFILE_NAMES={dabao:'大宝',xiaobao:'小宝'};
+const PROFILE_NAMES={dabao:'大宝',xiaobao:'小宝',public:'我的'};
 const LEGACY_KEYS=['dxxg.wrong','dxxg.stats','dxxg.sound','dxxg.grade',
   'dxxg.session','dxxg.run','dxxg.materials.v1','dxxg.review.v1','dxxg.review.device'];
 const LEGACY_CLAIM_KEY='dxxg.legacyOwner.v1';
@@ -480,9 +480,8 @@ function migrateLegacy(id,entries){
     return false;
   }
 }
-const Profile=(()=>{
-  try{const id=sessionStorage.getItem(PROFILE_ACTIVE_KEY);return PROFILE_NAMES[id]?id:'';}catch(e){return '';}
-})();
+// 通用入口使用独立的本机档案；旧大宝、小宝数据仍留在原存储键中。
+const Profile='public';
 const profileKey=key=>Profile?key+'.'+Profile:null;
 const K = {wrong:profileKey('dxxg.wrong'), stats:profileKey('dxxg.stats'),
   sound:profileKey('dxxg.sound'), grade:profileKey('dxxg.grade')};
@@ -506,7 +505,7 @@ function applyFontSize(){ document.body.dataset.fontSize=['normal','large','extr
 applyFontSize();
 const CLOUD_ENV='kaka888-d5ghfuff1958de22c';
 const CLOUD_KEY=profileKey('dxxg.cloud.v1');
-const Cloud={...load(CLOUD_KEY,{paired:false,profileId:'',lastSync:0}),app:null,busy:false,pending:false,timer:null,error:''};
+const Cloud={...load(CLOUD_KEY,{paired:false,profileId:'',lastSync:0}),app:null,authReady:null,busy:false,pending:false,timer:null,error:''};
 async function cloudApp(){
   if(Cloud.app) return Cloud.app;
   const url=new URL('cloudbase-sdk.js',location.href);
@@ -517,7 +516,13 @@ async function cloudApp(){
 }
 async function cloudCall(action,data={}){
   const app=await cloudApp(), auth=app.auth();
-  if(!auth.hasLoginState()) await auth.signInAnonymously();
+  if(Profile==='public'){
+    if(!Cloud.authReady) Cloud.authReady=(async()=>{
+      if(auth.hasLoginState()) await auth.signOut();
+      await auth.signInAnonymously();
+    })().catch(e=>{Cloud.authReady=null;throw e;});
+    await Cloud.authReady;
+  }else if(!auth.hasLoginState()) await auth.signInAnonymously();
   const response=await app.callFunction({name:action==='bind'?'moxiePair':'moxie',data:{action,...data}});
   const result=response.result;
   if(result?.success===true) return result.data;
@@ -871,17 +876,16 @@ async function ensureWorker(onMsg){
 let AI_STATE = 'unknown';   // cloud | ready | direct | degraded | none | unknown
 let AI_LAST_ERROR = '';
 async function checkAi(){
-  // 已配置过的旧设备仍可沿用本机 Key。
-  if(getApiCfg()){ AI_STATE = 'direct'; AI_LAST_ERROR = ''; return AI_STATE; }
   // 公网设备统一走默写专用云函数；照片与笔迹只在当次请求中使用。
   if(location.hostname==='kakayanjiahua-star.github.io'){
     try{
       const status=await cloudCall('visionStatus',{profileId:Profile});
       if(status.configured){AI_STATE='cloud';AI_LAST_ERROR='';return AI_STATE;}
       AI_LAST_ERROR='云端识别尚未配置';
-    }catch(e){AI_LAST_ERROR='先连接家长账号';}
+    }catch(e){AI_LAST_ERROR=e?.message||'云端暂不可用';}
     AI_STATE='none';return AI_STATE;
   }
+  if(getApiCfg()){ AI_STATE = 'direct'; AI_LAST_ERROR = ''; return AI_STATE; }
   // 局域网备用服务。
   try{
     const r = await fetch('api/health', {cache:'no-store'});
@@ -1053,10 +1057,10 @@ async function vlmDirect(cfg, blob, prompt=OCR_PROMPT){
 function ocrTier(section){ return ['A','B','C'].includes(String(section||'').toUpperCase())?String(section).toUpperCase():'B'; }
 
 async function aiOcr(files, onProgress){
-  const direct = getApiCfg();
+  const direct = location.hostname==='kakayanjiahua-star.github.io'?null:getApiCfg();
   if(!direct&&location.hostname==='kakayanjiahua-star.github.io'&&
      AI_STATE!=='cloud'&&await checkAi()!=='cloud')
-    throw new Error(AI_LAST_ERROR||'请先连接家长账号');
+    throw new Error(AI_LAST_ERROR||'拍照识别暂不可用');
   const acc = {words:[], sentences:[], notes:[], model:''};
   const total = files.length;
   for(let i=0;i<total;i++){
@@ -1074,6 +1078,7 @@ async function aiOcr(files, onProgress){
         }catch(e){ /* 主识别结果仍可供核对 */ }
       }
       j = { ok:true, schemaVersion:2, model: direct.model || 'qwen3-vl-plus',
+            has_a_section:data.has_a_section===true,
             words:data.words||[], sentences:data.sentences||[], notes:data.notes||[],
             fixed: data.fixed || [], ignored: data.ignored || '', unit:data.unit || '' };
     }else if(AI_STATE==='cloud'||Cloud.paired){
@@ -1089,8 +1094,10 @@ async function aiOcr(files, onProgress){
       if(!j.ok) throw new Error(j.message || j.error || 'AI 识别失败');
     }
     const defaultTier=j.schemaVersion===2?'B':pendingSource==='teacher'?'A':'B';
-    acc.words = acc.words.concat((j.words||[]).map(w=>({en:fixEnglishApostrophes(w.en), zh:w.zh||'', kind:'word',tier:ocrTier(w.section||defaultTier)})));
-    acc.sentences = acc.sentences.concat((j.sentences||[]).map(s=>({en:fixEnglishApostrophes(s.en), zh:s.zh||'', kind:'sent',tier:ocrTier(s.section||defaultTier)})));
+    const practiceTier=section=>j.has_a_section===false&&ocrTier(section||defaultTier)==='B'
+      ?'A':ocrTier(section||defaultTier);
+    acc.words = acc.words.concat((j.words||[]).map(w=>({en:fixEnglishApostrophes(w.en), zh:w.zh||'', kind:'word',tier:practiceTier(w.section)})));
+    acc.sentences = acc.sentences.concat((j.sentences||[]).map(s=>({en:fixEnglishApostrophes(s.en), zh:s.zh||'', kind:'sent',tier:practiceTier(s.section)})));
     acc.notes = acc.notes.concat((j.notes||[]).map(n=>String(n.text||'').trim()).filter(Boolean));
     acc.model = j.model || acc.model;
     acc.unit = acc.unit || String(j.unit||'').trim();
@@ -1154,7 +1161,7 @@ function go(r){
   if(!Profile&&r!=='profile') r='profile';
   if((r==='wrong'||r==='stats') && route!=='wrong' && route!=='stats') backTo = route;
   route=r;
-  $('#barTitle').textContent = (Profile?PROFILE_NAMES[Profile]+' · ':'')+(TITLES[r]||'英语默写小闯关');
+  $('#barTitle').textContent = (Profile&&Profile!=='public'?PROFILE_NAMES[Profile]+' · ':'')+(TITLES[r]||'英语默写小闯关');
   const bb=$('#btnBack'); if(bb) bb.classList.toggle('hide', r==='home'||r==='profile');
   const bh=$('#btnHome'); if(bh) bh.classList.toggle('hide', r==='home'||r==='profile');
   $('#btnSound').classList.toggle('hide', r==='profile'||['dictation','dictPlay','dictResult'].includes(r));
@@ -1238,12 +1245,6 @@ function renderSettings(){
       </div>
       <button class="btn primary" style="margin-top:24px" type="submit">保存设置</button>
     </form>
-    <div style="border-top:1px solid var(--line);margin-top:26px;padding-top:18px">
-      <h2>云端记录</h2><p class="sub" id="cloudStatus"></p>
-      <p class="sub">家长用电脑或手机打开 <a href="./parent.html" target="_blank" rel="noopener">家长页</a> 生成配对码，只需连接一次。</p>
-      <div class="row"><input id="cloudCode" class="dict-input" inputmode="numeric" autocomplete="one-time-code" maxlength="12" placeholder="12 位配对码" aria-label="默写配对码">
-      <button class="btn sm ghost" id="cloudPair" type="button">连接</button></div>
-    </div>
   </div></div>`;
   const form=$('#settingsForm'); form.elements.fontSize.value=Settings.fontSize; form.elements.grade.value=String(Store.grade);
   form.onsubmit=e=>{
@@ -1253,15 +1254,6 @@ function renderSettings(){
     Settings.fontSize=['normal','large','extra'].includes(form.elements.fontSize.value)?form.elements.fontSize.value:'normal';
     Store.grade=+form.elements.grade.value===5?5:3; save(K.grade,Store.grade);
     save(SETTINGS_KEY,Settings); applyFontSize(); go('home'); toast('设置已保存');
-  };
-  cloudPaintStatus();
-  $('#cloudPair').onclick=async()=>{
-    const code=$('#cloudCode').value.trim(), button=$('#cloudPair');
-    if(!/^\d{12}$/.test(code)){toast('请输入 12 位配对码');return;}
-    button.disabled=true; button.textContent='连接中…';
-    try{await cloudBind(code); toast('已连接，学习记录将自动同步');}
-    catch(e){Cloud.error=e?.message||'连接失败';toast(Cloud.error,3500);}
-    finally{button.disabled=false;button.textContent='连接';cloudPaintStatus();}
   };
 }
 function libraryHtml(){
@@ -1282,7 +1274,6 @@ function renderHome(){
   const hasDict=[...S.words,...S.sents].some(x=>x.on&&x.tier==='A');
   $('#wrap').innerHTML = `
   <div class="screen">
-    <button class="btn sm ghost" id="btnProfileChange" style="width:auto;margin:0 0 12px">${PROFILE_NAMES[Profile]} ⌄</button>
     ${reviewHomeCard()}
     <div class="dict-steps"><span class="on">① 准备词句</span><span>② 闯关练习</span><span>③ 课堂默写</span></div>
     <div class="card">
@@ -1338,7 +1329,6 @@ function renderHome(){
   </div>`;
 
   const pick = (inp)=>{ inp.value=''; inp.click(); };
-  $('#btnProfileChange').onclick=()=>go('profile');
   if($('#btnPlanHome')) $('#btnPlanHome').onclick=()=>go('plan');
   if($('#btnDueHome')) $('#btnDueHome').onclick=startReviewToday;
   $('#btnDictationHome').onclick = ()=>{ Dict.from='home'; Dict.source=hasDict?'current':'sample'; go('dictation'); };
@@ -1412,9 +1402,9 @@ async function refreshAiBadge(){
     }else if(AI_STATE==='none'){
       el.className='aibadge warn';
       el.innerHTML=location.hostname==='kakayanjiahua-star.github.io'
-        ? '⚠️ <b>先连接家长账号</b> · 点这里连接'
+        ? '⚠️ <b>拍照识别暂不可用</b> · 点这里重试'
         : '⚠️ <b>拍照识别待配置</b> · 点这里配置';
-      el.onclick=()=>{ if(location.hostname==='kakayanjiahua-star.github.io') go('settings'); else openKeySetup(); };
+      el.onclick=()=>{ if(location.hostname==='kakayanjiahua-star.github.io'){AI_STATE='unknown';refreshAiBadge();} else openKeySetup(); };
     }else{
       el.className='aibadge wait';
       el.innerHTML='正在检查识别引擎…';
@@ -1465,6 +1455,9 @@ function applyHashConfig(){
   const p = new URLSearchParams(h);
   const k = p.get('k');
   if(!k) return false;
+  if(location.hostname==='kakayanjiahua-star.github.io'){
+    history.replaceState(null,'',location.pathname+location.search);return false;
+  }
   setApiCfg(p.get('u')||'', k);
   try{ history.replaceState(null,'',location.pathname + location.search); }catch(e){ location.hash=''; }
   return true;
@@ -1721,7 +1714,7 @@ function applyParse(text, preview){
   if(!r.words.length && !r.sents.length){ toast('没识别出英文内容，检查一下'); return; }
   const previous=new Map([...S.words,...S.sents].map(x=>[norm(x.en),x.tier]));
   const source=preview?($('#sourceType')?.value||'other'):S.source;
-  const fallbackTier=preview?'B':source==='teacher'?'A':'B';
+  const fallbackTier=preview?'A':source==='teacher'?'A':'B';
   const candidate={source,title:preview?'':S.title,notes:preview?[]:S.notes,
     words:r.words.map(w=>({...w,on:true,tier:preview?fallbackTier:previous.get(norm(w.en))||fallbackTier})),
     sents:r.sents.map(s=>({...s,on:true,tier:preview?fallbackTier:previous.get(norm(s.en))||fallbackTier,key:pickKey(s.en)})),
@@ -3110,7 +3103,7 @@ function exportLearningArchive(){
   const a=document.createElement('a');
   a.href=url; a.download='英语默写学习档案-'+PROFILE_NAMES[Profile]+'-'+today()+'.json';
   document.body.appendChild(a); a.click(); a.remove();
-  toast('下载后请传到电脑上的孩子存档目录');
+  toast('学习档案已下载');
   setTimeout(()=>URL.revokeObjectURL(url),30000);
 }
 async function importLearningArchive(file){
@@ -3229,7 +3222,8 @@ function dictInkImage(cv){
 }
 const DICT_HAND_PROMPT = '只转写图片中学生手写的英文，不要根据题意猜测、补全或纠正拼写。看不清就返回空字符串。只输出 JSON：{"text":"看到的英文原文"}。';
 async function dictGradeHand(i){
-  const r=Dict.records[i], expected=Dict.items[i].en, cfg=getApiCfg();
+  const r=Dict.records[i], expected=Dict.items[i].en,
+    cfg=location.hostname==='kakayanjiahua-star.github.io'?null:getApiCfg();
   if(!r.ink){ r.ok=false; return; }
   try{
     const blob=await (await fetch(r.ink)).blob();
@@ -3298,10 +3292,9 @@ function renderDictationSetup(){
     '<div class="card"><h2>写法与节奏</h2>'+
     '<div class="dict-meta"><span>单词 '+Settings.wordSeconds+' 秒</span><span>4 音节以上 '+Settings.longWordSeconds+' 秒</span><span>句子 '+Settings.sentenceSeconds+' 秒</span></div>'+
     '<p class="sub">每题先报中文，再开始计时。</p>'+
-    (!Cloud.paired&&location.port!=='8101'?'<p class="sub">连接云端后启用 Vivi 2.0 中文播报。</p>':'')+
     '<div class="dict-source"><button class="chip '+(Dict.mode==='hand'?'on':'')+'" id="dictHand">✍️ 手指／笔，AI 核对</button>'+
     '<button class="chip '+(Dict.mode==='type'?'on':'')+'" id="dictType">⌨️ 打字，自动核对</button></div>'+
-    (Dict.mode==='hand'&&AI_STATE==='none'&&!getApiCfg()?'<p class="sub" style="margin-top:12px">手写识别未连接。请先在首页“设置”连接家长账号。</p>':'')+
+    (Dict.mode==='hand'&&AI_STATE==='none'?'<p class="sub" style="margin-top:12px">手写识别暂不可用，可改用打字。</p>':'')+
     '<div class="row" style="margin-top:14px"><button class="btn primary" id="dictStartWarm">先摸底</button>'+
     '<button class="btn ghost" id="dictStartMock">直接课堂连测</button></div></div></div>';
   if($('#dictUseCurrent')) $('#dictUseCurrent').onclick=()=>{ Dict.source='current'; renderDictationSetup(); };
@@ -3317,8 +3310,9 @@ function renderDictationSetup(){
 }
 async function dictStart(phase, useExisting=false){
   if(!useExisting){
-    if(Dict.mode==='hand'&&!getApiCfg()&&!['ready','cloud'].includes(AI_STATE)&&!['ready','cloud'].includes(await checkAi())){
-      toast('手写识别未连接，请先连接家长账号或改用打字'); return;
+    if(Dict.mode==='hand'&&(location.hostname==='kakayanjiahua-star.github.io'||!getApiCfg())&&
+       !['ready','cloud'].includes(AI_STATE)&&!['ready','cloud'].includes(await checkAi())){
+      toast('手写识别暂不可用，请稍后重试或改用打字'); return;
     }
     if(Dict.source==='current'&&!S.unit.trim()){ toast('先填本课 Unit，错题才能归类'); return; }
     Dict.fullItems=dictSourceItems();
