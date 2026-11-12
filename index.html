@@ -434,7 +434,7 @@ body[data-font-size="extra"] .btn{font-size:20px}
    英语默写小闯关 — 单文件版
    流程：拍照/粘贴 → 校对 → 闯关 → 默写测 → 错词本
    ========================================================= */
-const APP_VERSION = 'v2026-10-24';
+const APP_VERSION = 'v2026-11-12';
 const $  = (s,r=document)=>r.querySelector(s);
 const $$ = (s,r=document)=>[...r.querySelectorAll(s)];
 const esc = s => String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
@@ -941,9 +941,9 @@ function clearApiCfg(){ try{ localStorage.removeItem(KAPI); }catch(e){} AI_STATE
 
 const OCR_PROMPT = `你是英语知识梳理的逐项抄录员。按照片版面从上到下，提取全部 A/B/C 学习内容，只输出严格 JSON。
 标题中的年级与 Unit 放 unit 字段。A「核心词句（四会）」的词、词组、短句和完整句子都要提取；尤其逐行检查 A 区的「句」表，不能只读上方单词。B「其他词汇」也要逐项提取。C「句型与语法」整理为 notes，每条保留中文要点和示例。三部分都入库，只有 A 后续用于默写。
-words 数组放词或词组；sentences 数组放完整句或课堂口语短句，包括 Excellent!、Slow down.、Not exactly.；notes 数组放语法要点。每条必须有 section:"A"/"B"/"C"。若原图没有 A/B/C 标题，普通材料默认 section:"B"，供用户核对后改层级。
+words 数组放词或词组；sentences 数组放完整句或课堂口语短句，包括 Excellent!、Slow down.、Not exactly.；notes 数组放语法要点。每条必须有 section:"A"/"B"/"C"。只有照片里确实印有 A 区标题时，has_a_section 才能为 true，a_heading 必须逐字抄出该标题；没有就填 false 和空字符串，所有普通词句归 B，供用户核对后改层级。不要把 Unit 标题或提示里的 A 区示例当成照片标题。
 英文和对应中文照原文逐条配对，不合并相邻条目，保留大小写、连字符、标点。排除题号、页码、姓名栏、标题、照片外内容和看不清的条目。不要把 C 区示例句重复收入 A。输出前特别自查 A 句子数量及长单词拼写。无法确认的写进 ignored，不要猜造。
-只输出 JSON，不要 markdown：{"unit":"5A Unit 2","has_a_section":true,"words":[{"en":"traditional","zh":"传统的","section":"A"},{"en":"sandbag","zh":"沙包","section":"B"}],"sentences":[{"en":"Not exactly.","zh":"不完全是。","section":"A"}],"notes":[{"text":"祈使句：动词原形开头；否定式 Don't + 动词原形。","section":"C"}],"fixed":[],"ignored":""}`;
+只输出 JSON，不要 markdown：{"unit":"Unit 4","has_a_section":false,"a_heading":"","words":[{"en":"apple","zh":"苹果","section":"B"}],"sentences":[{"en":"I like apples.","zh":"我喜欢苹果。","section":"B"}],"notes":[],"fixed":[],"ignored":""}`;
 const OCR_SENT_PROMPT=`只看图片中 A「核心词句（四会）」区里的「句」栏，逐行抄录英文短句和右侧中文。不要读 B/C，也不要把词汇栏内容当句子。短句如 Excellent!、Slow down.、Not exactly. 都要保留。看不清就不要猜。只输出 JSON：{"sentences":[{"en":"Not exactly.","zh":"不完全是。","section":"A"}]}`;
 
 const INSTRUCTION_WORDS = new Set(('read write listen say look match choose fill answer complete tick circle '+
@@ -1055,6 +1055,7 @@ async function vlmDirect(cfg, blob, prompt=OCR_PROMPT){
 }
 
 function ocrTier(section){ return ['A','B','C'].includes(String(section||'').toUpperCase())?String(section).toUpperCase():'B'; }
+function ocrHasA(data){ return data.has_a_section===true && /^A[.．、:：)）\s]+\S/i.test(String(data.a_heading||'').trim()); }
 
 async function aiOcr(files, onProgress){
   const direct = location.hostname==='kakayanjiahua-star.github.io'?null:getApiCfg();
@@ -1071,14 +1072,14 @@ async function aiOcr(files, onProgress){
     let j = null;
     if(direct){
       const data = await vlmDirect(direct, blob);
-      if(data.has_a_section===true && !(data.sentences||[]).some(s=>ocrTier(s.section)==='A')){
+      if(ocrHasA(data) && !(data.sentences||[]).some(s=>ocrTier(s.section)==='A')){
         try{
           const focused=await vlmDirect(direct,blob,OCR_SENT_PROMPT);
           data.sentences=[...(data.sentences||[]),...(focused.sentences||[]).map(s=>({...s,section:'A'}))];
         }catch(e){ /* 主识别结果仍可供核对 */ }
       }
       j = { ok:true, schemaVersion:2, model: direct.model || 'qwen3-vl-plus',
-            has_a_section:data.has_a_section===true,
+            has_a_section:ocrHasA(data),
             words:data.words||[], sentences:data.sentences||[], notes:data.notes||[],
             fixed: data.fixed || [], ignored: data.ignored || '', unit:data.unit || '' };
     }else if(AI_STATE==='cloud'||Cloud.paired){
@@ -1094,8 +1095,8 @@ async function aiOcr(files, onProgress){
       if(!j.ok) throw new Error(j.message || j.error || 'AI 识别失败');
     }
     const defaultTier=j.schemaVersion===2?'B':pendingSource==='teacher'?'A':'B';
-    const practiceTier=section=>j.has_a_section===false&&ocrTier(section||defaultTier)==='B'
-      ?'A':ocrTier(section||defaultTier);
+    const practiceTier=section=>j.has_a_section===false&&ocrTier(section||defaultTier)==='A'
+      ?'B':ocrTier(section||defaultTier);
     acc.words = acc.words.concat((j.words||[]).map(w=>({en:fixEnglishApostrophes(w.en), zh:w.zh||'', kind:'word',tier:practiceTier(w.section)})));
     acc.sentences = acc.sentences.concat((j.sentences||[]).map(s=>({en:fixEnglishApostrophes(s.en), zh:s.zh||'', kind:'sent',tier:practiceTier(s.section)})));
     acc.notes = acc.notes.concat((j.notes||[]).map(n=>String(n.text||'').trim()).filter(Boolean));
